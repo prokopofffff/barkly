@@ -1,0 +1,17 @@
+#!/bin/sh
+# Barkly pre-commit gate. Enabled via `core.hooksPath .githooks` (set by the
+# "prepare" script on `bun install`). Bypass a single commit with: git commit --no-verify
+set -e
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "pre-commit: bun not found — install Bun (https://bun.sh) and retry." >&2
+  exit 1
+fi
+
+echo "pre-commit: typecheck…"
+bun run typecheck
+
+echo "pre-commit: lint…"
+bun run lint
+
+echo "pre-commit: ok"
