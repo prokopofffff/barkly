@@ -61,7 +61,7 @@ src/
 
 - **Reads:** reactive `useQuery` against the local replica. Define reusable query
   builders in `src/lib/zero/queries.ts`; don't inline ad-hoc queries in screens.
-- **Writes go through Zero custom mutators → the Go backend.** Never write to a
+- **Writes go through Zero custom mutators → the TypeScript/Hono backend.** Never write to a
   remote DB directly from the client; the client only calls mutators.
 - **`src/lib/zero/schema.ts` mirrors the Postgres schema** that zero-cache
   replicates. Schema changes are coordinated with a Postgres migration — never
@@ -93,7 +93,7 @@ src/
 
 - Client config via `EXPO_PUBLIC_*` env vars (see `.env.example`). These are
   **inlined into the bundle and public — never put a secret in one.**
-- Secrets live only on the Go backend. The client holds only the user's JWT,
+- Secrets live only on the TypeScript/Hono backend. The client holds only the user's JWT,
   stored via `expo-secure-store`.
 
 ## 10. Quality gates
