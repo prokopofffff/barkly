@@ -1,0 +1,53 @@
+# Local dev stack: Postgres + zero-cache + this service.
+# `docker compose up` should give a working backend from a clean checkout.
+services:
+  postgres:
+    image: postgres:16
+    # wal_level=logical is required for Zero's replication.
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_USER: barkly
+      POSTGRES_PASSWORD: barkly
+      POSTGRES_DB: barkly
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U barkly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Rocicorp Zero sync engine. Stateful: keeps a SQLite replica on disk.
+  zero-cache:
+    image: rocicorp/zero:latest
+    environment:
+      ZERO_UPSTREAM_DB: postgresql://barkly:barkly@postgres:5432/barkly
+      ZERO_REPLICA_FILE: /zero/replica.db
+      ZERO_AUTH_SECRET: change-me-dev-only # must match the app's JWT_SECRET
+      ZERO_PUSH_URL: http://app:3000/push
+    ports:
+      - "4848:4848"
+    volumes:
+      - zerodata:/zero
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build: .
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: postgresql://barkly:barkly@postgres:5432/barkly
+      JWT_SECRET: change-me-dev-only
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  zerodata:

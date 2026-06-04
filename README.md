@@ -1,79 +1,57 @@
-# Barkly — mobile
+# Barkly / ГАВ — monorepo
 
-A TikTok-style language-learning app: learn by scrolling a vertical video feed.
+A TikTok × Duolingo language-learning app (Russian speakers learning English):
+an addictive vertical video feed with inline quizzes and Duolingo-style
+gamification. Bun workspaces hold the mobile app and its backend together so the
+shared **Zero** sync contract stays in lockstep.
 
-## Frontend stack
+```
+apps/
+  mobile/   Expo (SDK 56) + Expo Router + NativeWind + Zero  — the app
+  server/   Hono + Drizzle + Postgres + Zero push/auth       — the backend
+packages/   (reserved) shared code, e.g. the Zero schema + mutators
+```
 
-| Concern | Choice |
-| --- | --- |
-| Framework | **Expo** (SDK 56) + dev client / prebuild |
-| Language | **TypeScript** |
-| Package manager | **Bun** |
-| Navigation | **Expo Router** (file-based, `src/app`) |
-| Styling | **NativeWind** (Tailwind for RN) |
-| Video feed | **@shopify/flash-list** + **expo-video** |
-| Local-first data + sync | **Zero** (`@rocicorp/zero`) over SQLite |
-| Auth | anonymous-first ("deferred registration"), link Apple/Google/email later |
-| Secure storage | **expo-secure-store** |
-
-> ⚠️ Zero uses `expo-sqlite`/`op-sqlite`, which don't run in **Expo Go**. Use a
-> **development build**: `bunx expo prebuild` then `bunx expo run:ios|run:android`.
+## Prerequisites
+- **Bun** (package manager for the whole repo — never `npm`/`yarn`).
+- For the mobile app: a dev build toolchain (Xcode / Android Studio). No Expo Go.
+- For the backend: Docker (Postgres + zero-cache via `apps/server/docker-compose.yml`).
 
 ## Getting started
-
 ```bash
-bun install
-cp .env.example .env        # fill in your endpoints (optional for first run)
+bun install                 # one install for all workspaces (hoisted node_modules)
 
-# Development build (required for Zero + native video):
-bunx expo prebuild
-bunx expo run:ios           # or: bunx expo run:android
+# Mobile (from apps/mobile, or via root scripts):
+bun run mobile              # = bun --filter barkly-mobile run start
+#   first run needs a dev build: cd apps/mobile && bunx expo prebuild && bunx expo run:ios
+
+# Backend:
+bun run server             # = bun --filter barkly-back run dev
+#   full local stack: cd apps/server && docker compose up
 ```
 
-The app boots into the vertical feed using placeholder data (`src/lib/feed/sample-videos.ts`)
-and a fresh **anonymous** user — no backend required to see it run.
-
-> `bun install` blocks the lifecycle scripts of `@rocicorp/zero-sqlite3` and
-> `protobufjs`. Those are **server-side only** (used by `zero-cache` on Node, not
-> bundled into the app), so the mobile build is unaffected. If you self-host
-> `zero-cache` from this repo, run `bun pm trust @rocicorp/zero-sqlite3 protobufjs`.
-
-## How it fits together
-
-```
-[Postgres 15+]  source of truth
-   │ logical replication
-[zero-cache]    Rocicorp sync service (self-hosted)  ──sync──▶  app (SQLite replica)
-   │ push (mutations)
-[Go API]        auth, custom mutators, anon→real account merge
-[CDN / Mux]     HLS video delivery (separate from sync; app just plays the URL)
+## Quality gates
+```bash
+bun run check              # typecheck + lint across every workspace (pre-commit runs this)
+bun run typecheck          # tsc --noEmit in every workspace
+bun run lint               # eslint in every workspace
+# per-app extras:
+cd apps/mobile && bun run doctor   # expo-doctor (expect 21/21)
+cd apps/server && bun test
 ```
 
-- **Reads** sync automatically via Zero into a local SQLite replica → instant + offline.
-- **Writes** (progress, likes) go through Zero *custom mutators* → the Go push endpoint.
-- **Video** is never synced; `video.hlsUrl` points at your CDN, played by `expo-video`.
+## Conventions
+- **Mobile:** [`apps/mobile/docs/DEV_STANDARDS.md`](apps/mobile/docs/DEV_STANDARDS.md)
+- **Backend:** [`apps/server/docs/DEV_STANDARDS.md`](apps/server/docs/DEV_STANDARDS.md)
+- **Backend build-out plan:** [`apps/server/docs/BACKEND_PLAN.md`](apps/server/docs/BACKEND_PLAN.md)
 
-## Project layout
-
-```
-src/
-  app/
-    _layout.tsx          providers (Gesture → SafeArea → Auth → Zero) + Stack
-    index.tsx            the vertical video feed
-  components/
-    feed-video.tsx       single full-screen clip (plays only when active)
-  lib/
-    auth/auth-context.tsx   anonymous-first session + account linking
-    zero/schema.ts          Zero schema (user, video, progress, like)
-    zero/provider.tsx       ZeroProvider wired to the current user
-    zero/queries.ts         example reactive queries
-    feed/sample-videos.ts   placeholder feed data (swap for a Zero query)
-```
-
-## Next steps
-
-- [ ] Stand up Postgres + zero-cache, set `EXPO_PUBLIC_ZERO_SERVER`.
-- [ ] Build the Go backend: `/auth/anonymous`, account-linking, Zero push endpoint.
-- [ ] Swap `SAMPLE_VIDEOS` for `useFeedQuery(...)` (see `src/lib/zero/queries.ts`).
-- [ ] Pick video infra (Mux / Cloudflare Stream / self-hosted) and populate `video.hlsUrl`.
-- [ ] Add Sign in with Apple (required by App Store when offering Google login).
+## Notes
+- `bunfig.toml` pins Bun to the **hoisted** linker — Expo/Metro need a flat
+  `node_modules`. Don't remove it or `expo-doctor` will report duplicate deps.
+- The **Zero contract** lives in `packages/zero` (`@barkly/zero`), shared by
+  both apps. `apps/server/src/db/schema.ts` (Drizzle) is the **Postgres source
+  of truth**; the Zero schema (`packages/zero/src/schema.gen.ts`) is generated
+  from it via **drizzle-zero** — run `bun --filter barkly-back run zero:generate`
+  after changing the Drizzle schema. The custom mutators are hand-written in
+  `@barkly/zero` and run on both client and server. See
+  `apps/server/docs/BACKEND_PLAN.md`.
