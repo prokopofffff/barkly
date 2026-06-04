@@ -11,7 +11,10 @@ import { Icon } from '@/components/icon';
 import { Sharik } from '@/components/mascot';
 import { PrimaryButton } from '@/components/primary-button';
 import { COLORS } from '@/constants/gav';
+import { useAuth } from '@/lib/auth/auth-context';
 import { useGame } from '@/lib/feed/game-context';
+import { useLocalProfile } from '@/lib/profile/local-profile';
+import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
 
 const STEPS = 5;
 
@@ -46,6 +49,9 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { earn } = useGame();
+  const { user } = useAuth();
+  const z = useZeroApp();
+  const { completeOnboarding } = useLocalProfile();
 
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<string | null>(null);
@@ -61,7 +67,24 @@ export default function OnboardingScreen() {
     if (step < STEPS - 1) {
       setStep(step + 1);
     } else {
+      // Persist the answers + flip `onboarded` (this is what the gate reads),
+      // then award the starter bonus and drop into the feed.
+      const prefs = { level: level ?? '', goals, target };
+      completeOnboarding(prefs);
       earn(50, 1);
+      // Sync the answers to the user row when a backend is wired (the +50 XP
+      // bonus rides on earnXp above, so completeOnboarding stays XP-free).
+      if (ZERO_ENABLED && user?.userID) {
+        const r = z.mutate.completeOnboarding({
+          userID: user.userID,
+          learningLang: 'en',
+          learningLevel: prefs.level,
+          goals: prefs.goals,
+          dailyTarget: prefs.target,
+        });
+        r.client.catch(() => {});
+        r.server.catch(() => {});
+      }
       router.replace('/');
     }
   };

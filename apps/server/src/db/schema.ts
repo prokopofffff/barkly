@@ -14,8 +14,14 @@ export const user = pgTable("user", {
   handle: text("handle").notNull(),
   name: text("name").notNull(),
   isAnonymous: boolean("is_anonymous").notNull().default(true),
+  email: text("email"), // set when an email identity is linked; null otherwise
   nativeLang: text("native_lang").notNull().default("ru"),
   learningLang: text("learning_lang").notNull().default("en"),
+  // Onboarding answers (collected before the feed; synced so they carry across
+  // devices once linked). `goals` is jsonb — Zero models arrays as json.
+  learningLevel: text("learning_level").notNull().default(""), // CEFR self-rating
+  goals: jsonb("goals").$type<readonly string[]>().notNull().default([]),
+  dailyTarget: integer("daily_target").notNull().default(0), // minutes/day goal
   level: integer("level").notNull().default(1),
   levelName: text("level_name").notNull().default(""),
   xp: integer("xp").notNull().default(0),
@@ -27,6 +33,9 @@ export const user = pgTable("user", {
   leagueRank: integer("league_rank").notNull().default(0),
   mascotCosmetic: text("mascot_cosmetic").notNull().default(""),
   onboarded: boolean("onboarded").notNull().default(false),
+  // Set when this row was folded into another on identity link (account merge,
+  // BACKEND_PLAN §6). A tombstone: the row is kept for idempotent re-links.
+  mergedInto: text("merged_into"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 

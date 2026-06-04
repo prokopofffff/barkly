@@ -154,10 +154,17 @@ Migrations live with the backend (e.g. `drizzle`/`kysely` migrations). **Never e
 
 - Deploy `zero-cache` pointed at Postgres logical replication (`wal_level=logical`).
 - Set `EXPO_PUBLIC_ZERO_SERVER` to its public WebSocket URL → flips `ZERO_ENABLED`.
-- **Read permissions** (zero-permissions config): `video`/`creator`/`league*` are
-  public; `app_user`, `vocabulary`, `achievement`, `cosmetic`, `notification`,
-  `like`, `follow`, `progress` are row-scoped to `auth.sub === user_id`.
+- **Read permissions** — implemented in `packages/zero/src/permissions.ts`
+  (`definePermissions`): `video`/`leagueMember` are public; `user` (by `id`) and
+  `vocabulary`/`achievement`/`cosmetic`/`notification`/`like`/`follow`/`progress`
+  (by `user_id`) are row-scoped to `auth.sub`. zero-cache denies reads with no
+  rule, so deploy them after `db:migrate`/`db:seed`:
+  `ZERO_UPSTREAM_DB=… bun run zero:deploy-perms` (writes the upstream
+  `zero.permissions` table; entry = `src/zero/schema-config.ts`). Writes are NOT
+  governed here — they go through the authoritative push mutators (§5).
+  (`definePermissions` is deprecated in Zero 1.6 → migrate to query/mutator auth.)
 - JWT verification key shared with the auth service (`ZERO_AUTH_SECRET`/JWKS).
+  Note: `ZERO_AUTH_SECRET` is deprecated in zero-cache 1.6 (move to a JWK).
 
 ---
 
@@ -199,6 +206,49 @@ Implements the stubs in `src/lib/auth/auth-context.tsx`:
 - JWT: `sub = userID`, short TTL + refresh; signed with `ZERO_AUTH_SECRET`. The client
   stores it in `expo-secure-store` and hands it to Zero as `auth`.
 - **Sign in with Apple is mandatory** if we offer Google/email (App Store rule).
+- **Email is unverified for now** — the client links in place with email+password and
+  no confirmation. Follow-up: `POST /auth/email/start` (send OTP) + `/auth/email/verify`
+  (confirm code, then flip `is_anonymous`). Until then treat email-linked accounts as
+  unverified.
+- An **identity table** maps providers → user: `auth_identity(provider, subject, user_id)`
+  with `unique(provider, subject)`. Linking inserts a row; one `app_user` can own
+  several identities (Apple + Google + email all resolving to the same `userID`).
+- The onboarding answers the client collects (CEFR level / goals / daily target) have
+  **no columns yet** — add `learning_level text`, `goals text[]`, `daily_target int`
+  to `app_user` (one migration) so they can sync. Until then the mobile app keeps them
+  device-local (`src/lib/profile/local-profile.tsx`) and only `onboarded`/`learning_lang`
+  round-trip via the `completeOnboarding` mutator.
+
+### Account merge on link
+
+Linking is **identity-keyed**, so platform (iOS/Android) is irrelevant — a merge is
+needed only when the **same identity** (an email/Apple/Google subject) is presented
+from a second device that already accrued anonymous progress.
+
+- **No conflict** (identity is new): just bind it to the current `userID`. Done.
+- **Conflict** (identity already maps to user `A`, current device is anon user `B`):
+  fold `B` into the canonical `A`, return `A`'s `{ userID, token }`, and let the client
+  re-partition its Zero store. Do the whole fold in **one Postgres transaction**.
+
+Per-field merge policy (server-authoritative — recompute, never trust the client):
+
+| Data | Rule |
+| --- | --- |
+| `xp`, `gems` | **sum**, but **excluding starter/onboarding bonuses** — only earned XP merges (track bonus XP separately, or subtract the known +50 onboarding grant before summing) so multi-device farming can't inflate totals |
+| `level`, `xp_to_next`, `xp_today` | **recompute** from the merged `xp` (do not add directly) |
+| `streak`, `last_active` | **max** |
+| `vocabulary` | **union by word**, keep the higher `mastery` |
+| `cosmetic` (owned) | **union**; equipped cosmetic taken from canonical `A` |
+| `achievement` | **union**; `done=true` wins, `pct = max` |
+| `follow`, `like` | **union**, dedup by target |
+| `progress` (per video) | **union by `video_id`**; `max(watched_ms, score)`, `completed=true` wins |
+| `native_lang` / `learning_lang` / onboarding prefs | take `A`'s; fall back to `B` only where `A` is empty |
+
+- **Idempotency**: key the merge on the link request (or Zero's `mutationID`) and
+  tombstone `B` with `merged_into = A` instead of hard-deleting, so a retried link is a
+  no-op and any late-arriving `B` writes can be redirected.
+- **Starter-bonus rule** (above) is the one explicit anti-abuse measure for v1; broader
+  economy re-derivation lives in the push endpoint (§5).
 
 ---
 

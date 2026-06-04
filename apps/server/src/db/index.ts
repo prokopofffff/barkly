@@ -2,7 +2,8 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { config } from "@/lib/config";
 import * as schema from "@/db/schema";
+import * as authSchema from "@/db/auth-schema";
 
 const client = postgres(config.DATABASE_URL);
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(client, { schema: { ...schema, ...authSchema } });

@@ -6,13 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { Icon, type IconName } from '@/components/icon';
 import { IconButton } from '@/components/icon-button';
+import { LinkAccountCard } from '@/components/link-account-banner';
 import { Sharik } from '@/components/mascot';
 import { ProgressRing } from '@/components/progress-ring';
 import { SectionHead } from '@/components/section-head';
 import { XPBar } from '@/components/xp-bar';
 import { COLORS, GRADIENTS } from '@/constants/gav';
+import { useAuth } from '@/lib/auth/auth-context';
 import { ACHIEVEMENTS, USER } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
+import { useLocalProfile } from '@/lib/profile/local-profile';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
 
 const WEEK = [40, 70, 30, 90, 55, 100, 65];
@@ -27,6 +30,11 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, savedWords, cosmetic } = useGame();
+  const { user } = useAuth();
+  const { linkPromptDismissed } = useLocalProfile();
+
+  // Profile is the account hub: nudge an anonymous learner to secure progress.
+  const showLinkCard = !!user?.isAnonymous && !linkPromptDismissed;
 
   return (
     <ScrollView
@@ -86,6 +94,13 @@ export default function ProfileScreen() {
           <XPBar value={state.xp} max={USER.xpToNext} height={10} />
         </View>
       </LinearGradient>
+
+      {/* link-account nudge (anonymous only) */}
+      {showLinkCard && (
+        <View style={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 8 }}>
+          <LinkAccountCard />
+        </View>
+      )}
 
       {/* stats grid */}
       <View className="flex-row flex-wrap gap-3" style={{ paddingHorizontal: 22, paddingVertical: 4 }}>

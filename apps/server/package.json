@@ -12,9 +12,10 @@
     "test": "bun test",
     "check": "bun run typecheck && bun run lint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
     "zero:generate": "drizzle-zero generate -s src/db/schema.ts -o ../../packages/zero/src/schema.gen.ts --enable-legacy-queries --suppress-defaults-warning -f",
+    "zero:deploy-perms": "zero-deploy-permissions -p src/zero/schema-config.ts",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {

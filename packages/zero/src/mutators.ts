@@ -19,6 +19,14 @@ import type { Schema } from './schema';
 
 type Tx = Transaction<Schema>;
 
+/**
+ * Starter XP granted once for finishing onboarding. Shared so the client awards
+ * it, and the server EXCLUDES it when merging accounts on identity link
+ * (BACKEND_PLAN §6) — otherwise farming onboarding bonuses across throwaway
+ * anonymous devices would inflate the merged total.
+ */
+export const ONBOARDING_BONUS_XP = 50;
+
 /** New gamification totals after an action (client-optimistic; server recomputes). */
 type EarnArgs = { userID: string; xp: number; xpToday: number; gems: number; streak: number };
 
@@ -26,15 +34,30 @@ export type AppMutators = ReturnType<typeof createMutators>;
 
 export function createMutators() {
   return {
-    /** Award XP/gems (e.g. liking, saving a word). */
-    async earnXp(tx: Tx, a: EarnArgs) {
+    /**
+     * Award XP/gems (e.g. liking, saving a word). The client writes its
+     * optimistic totals (xp/xpToday/gems); the authoritative server ignores
+     * them and recomputes from `amount` + current DB state (anti-cheat, §5).
+     */
+    async earnXp(tx: Tx, a: EarnArgs & { amount: number }) {
       await tx.mutate.user.update({ id: a.userID, xp: a.xp, xpToday: a.xpToday, gems: a.gems, streak: a.streak });
     },
 
-    /** Record a quiz result and award its XP. */
+    /**
+     * Record a quiz result and award its XP. The client sends its optimistic
+     * `correct`/`score`; the server re-grades `selected` against the stored
+     * `video.quiz.answer` and awards XP from that (core anti-cheat path, §5).
+     */
     async completeQuiz(
       tx: Tx,
-      a: EarnArgs & { progressID: string; videoID: string; correct: boolean; score: number },
+      a: EarnArgs & {
+        progressID: string;
+        videoID: string;
+        correct: boolean;
+        score: number;
+        /** The learner's chosen answer (index, or word order for reorder). */
+        selected: number | readonly string[];
+      },
     ) {
       await tx.mutate.progress.upsert({
         id: a.progressID,
@@ -98,18 +121,28 @@ export function createMutators() {
       await tx.mutate.user.update({ id: a.userID, gems: a.gems, mascotCosmetic: a.cosmeticId });
     },
 
-    /** Persist onboarding choices and the starter XP bonus. */
+    /**
+     * Persist onboarding answers and flip `onboarded`. The starter XP bonus is
+     * awarded separately via `earnXp` (so the merge logic can exclude it), so
+     * this mutator intentionally does NOT touch xp/gems.
+     */
     async completeOnboarding(
       tx: Tx,
-      a: { userID: string; learningLang: string; xp: number; xpToday: number; gems: number },
+      a: {
+        userID: string;
+        learningLang: string;
+        learningLevel: string;
+        goals: readonly string[];
+        dailyTarget: number;
+      },
     ) {
       await tx.mutate.user.update({
         id: a.userID,
         learningLang: a.learningLang,
+        learningLevel: a.learningLevel,
+        goals: a.goals,
+        dailyTarget: a.dailyTarget,
         onboarded: true,
-        xp: a.xp,
-        xpToday: a.xpToday,
-        gems: a.gems,
       });
     },
   } satisfies CustomMutatorDefs;
