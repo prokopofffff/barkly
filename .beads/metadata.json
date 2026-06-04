@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "valencia",
+  "project_id": "fee579f8-15b7-4cee-bb75-2536c1493e29"
+}
