@@ -5,9 +5,12 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { CommentsSheet } from '@/components/comments-sheet';
 import { FeedVideo } from '@/components/feed-video';
+import { LinkAccountOverlay } from '@/components/link-account-banner';
 import { QuizSheet } from '@/components/quiz-sheet';
 import { RewardBurst, type Burst } from '@/components/reward-burst';
+import { useAuth } from '@/lib/auth/auth-context';
 import { useGame } from '@/lib/feed/game-context';
+import { LINK_PROMPT_QUIZ_THRESHOLD, useLocalProfile } from '@/lib/profile/local-profile';
 import { type FeedVideoItem } from '@/lib/feed/sample-videos';
 import { useFeedVideos } from '@/lib/zero/hooks';
 
@@ -28,6 +31,8 @@ export default function FeedScreen() {
   const router = useRouter();
   const videos = useFeedVideos();
   const { state, earn, saveWord } = useGame();
+  const { user } = useAuth();
+  const { quizzesCompleted, linkPromptDismissed, recordQuizCompleted } = useLocalProfile();
   const [activeIndex, setActiveIndex] = useState(0);
   const [quizOpen, setQuizOpen] = useState(false);
   const [burst, setBurst] = useState<Burst | null>(null);
@@ -49,10 +54,16 @@ export default function FeedScreen() {
     setQuizOpen(false);
     const newCombo = correct ? state.combo + 1 : 0;
     earn(correct ? xp : 0, newCombo);
+    recordQuizCompleted(); // feeds the "save your progress" nudge threshold
     const id = Math.random();
     setBurst(correct ? { id, correct: true, xp, combo: newCombo } : { id, correct: false });
     setTimeout(() => setBurst((b) => (b && b.id === id ? null : b)), correct ? 1500 : 1250);
   };
+
+  // After a few completed quizzes, nudge an anonymous learner to secure their
+  // progress — never before they've invested, always dismissable.
+  const showLinkNudge =
+    !!user?.isAnonymous && !linkPromptDismissed && quizzesCompleted >= LINK_PROMPT_QUIZ_THRESHOLD;
 
   const activeVideo = videos[activeIndex];
 
@@ -92,6 +103,8 @@ export default function FeedScreen() {
       {burst && <RewardBurst key={burst.id} data={burst} />}
 
       {commentsFor && <CommentsSheet count={commentsFor.comments} onClose={() => setCommentsFor(null)} />}
+
+      {showLinkNudge && <LinkAccountOverlay />}
     </View>
   );
 }

@@ -9,8 +9,9 @@ services:
       POSTGRES_USER: barkly
       POSTGRES_PASSWORD: barkly
       POSTGRES_DB: barkly
+    # Host port overridable (PG_PORT) to avoid clashing with a native Postgres.
     ports:
-      - "5432:5432"
+      - "${PG_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -26,9 +27,12 @@ services:
       ZERO_UPSTREAM_DB: postgresql://barkly:barkly@postgres:5432/barkly
       ZERO_REPLICA_FILE: /zero/replica.db
       ZERO_AUTH_SECRET: change-me-dev-only # must match the app's JWT_SECRET
+      ZERO_ADMIN_PASSWORD: change-me-dev-only # required by zero-cache 1.5+
       ZERO_PUSH_URL: http://app:3000/push
+    # Host port is overridable (ZERO_PORT) so multiple stacks / worktrees can run
+    # side by side without colliding on 4848.
     ports:
-      - "4848:4848"
+      - "${ZERO_PORT:-4848}:4848"
     volumes:
       - zerodata:/zero
     depends_on:

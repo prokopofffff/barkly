@@ -55,7 +55,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       };
       setState((s) => ({ ...s, ...next, combo }));
       if (ZERO_ENABLED && user?.userID) {
-        fire(z.mutate.earnXp({ userID: user.userID, ...next, streak: state.streak }));
+        // `amount` lets the server recompute authoritatively; `next` is the
+        // client's optimistic total (see mutators.ts earnXp).
+        fire(z.mutate.earnXp({ userID: user.userID, amount, ...next, streak: state.streak }));
       }
     },
     [z, user, state],
