@@ -1,0 +1,5 @@
+# Use a flat, hoisted node_modules (npm/yarn-style) instead of Bun's isolated
+# store. Expo / Metro and expo-doctor expect a single hoisted install per
+# package; the isolated linker trips the "duplicate dependencies" check.
+[install]
+linker = "hoisted"

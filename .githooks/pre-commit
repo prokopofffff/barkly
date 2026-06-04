@@ -1,6 +1,7 @@
 #!/bin/sh
-# Barkly pre-commit gate. Enabled via `core.hooksPath .githooks` (set by the
-# "prepare" script on `bun install`). Bypass a single commit with: git commit --no-verify
+# Barkly monorepo pre-commit gate. Enabled via `core.hooksPath .githooks` (set by
+# the root "prepare" script on `bun install`). Runs typecheck + lint across every
+# workspace (apps/mobile, apps/server, …). Bypass once with: git commit --no-verify
 set -e
 
 if ! command -v bun >/dev/null 2>&1; then
@@ -8,10 +9,7 @@ if ! command -v bun >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "pre-commit: typecheck…"
-bun run typecheck
-
-echo "pre-commit: lint…"
-bun run lint
+echo "pre-commit: check all workspaces…"
+bun run check
 
 echo "pre-commit: ok"

@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   check:
-    name: typecheck · lint · doctor
+    name: typecheck · lint · doctor · test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,14 +22,16 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: Install dependencies (workspace)
         run: bun install --frozen-lockfile
 
-      - name: Typecheck
-        run: bun run typecheck
+      - name: Typecheck + lint (all workspaces)
+        run: bun run check
 
-      - name: Lint
-        run: bun run lint
-
-      - name: Expo Doctor
+      - name: Expo Doctor (mobile)
         run: bun run doctor
+        working-directory: apps/mobile
+
+      - name: Tests (server)
+        run: bun test
+        working-directory: apps/server

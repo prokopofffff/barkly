@@ -1,57 +1,21 @@
 {
-  "name": "barkly-mobile",
-  "main": "expo-router/entry",
-  "version": "1.0.0",
-  "dependencies": {
-    "@expo/ui": "~56.0.15",
-    "@rocicorp/zero": "^1.5.0",
-    "@shopify/flash-list": "2.0.2",
-    "expo": "~56.0.8",
-    "expo-constants": "~56.0.16",
-    "expo-device": "~56.0.4",
-    "expo-font": "~56.0.5",
-    "expo-glass-effect": "~56.0.4",
-    "expo-image": "~56.0.9",
-    "expo-linking": "~56.0.13",
-    "expo-router": "~56.2.8",
-    "expo-secure-store": "~56.0.4",
-    "expo-splash-screen": "~56.0.10",
-    "expo-sqlite": "~56.0.4",
-    "expo-status-bar": "~56.0.4",
-    "expo-symbols": "~56.0.5",
-    "expo-system-ui": "~56.0.5",
-    "expo-video": "~56.1.2",
-    "expo-web-browser": "~56.0.5",
-    "nativewind": "^4.2.4",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-native": "0.85.3",
-    "react-native-gesture-handler": "~2.31.1",
-    "react-native-reanimated": "4.3.1",
-    "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "4.25.2",
-    "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.8.3",
-    "tailwindcss": "^3.4.19"
-  },
-  "devDependencies": {
-    "@types/react": "~19.2.2",
-    "eslint": "^9",
-    "eslint-config-expo": "^56.0.4",
-    "expo-doctor": "^1.19.8",
-    "typescript": "~6.0.3"
-  },
+  "name": "barkly",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "typecheck": "tsc --noEmit",
-    "lint": "expo lint",
-    "doctor": "expo-doctor",
-    "check": "bun run typecheck && bun run lint",
+    "check": "bun run --filter '*' check",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "bun run --filter '*' lint",
+    "mobile": "bun run --filter barkly-mobile start",
+    "server": "bun run --filter barkly-back dev",
     "prepare": "git config core.hooksPath .githooks || true"
   },
-  "private": true
+  "trustedDependencies": [
+    "@rocicorp/zero-sqlite3",
+    "protobufjs",
+    "unrs-resolver"
+  ]
 }
