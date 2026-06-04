@@ -45,12 +45,12 @@ and a fresh **anonymous** user — no backend required to see it run.
    │ logical replication
 [zero-cache]    Rocicorp sync service (self-hosted)  ──sync──▶  app (SQLite replica)
    │ push (mutations)
-[Go API]        auth, custom mutators, anon→real account merge
+[TS/Hono API]   auth, custom mutators, anon→real account merge (apps/server)
 [CDN / Mux]     HLS video delivery (separate from sync; app just plays the URL)
 ```
 
 - **Reads** sync automatically via Zero into a local SQLite replica → instant + offline.
-- **Writes** (progress, likes) go through Zero *custom mutators* → the Go push endpoint.
+- **Writes** (progress, likes) go through Zero *custom mutators* → the Hono push endpoint.
 - **Video** is never synced; `video.hlsUrl` points at your CDN, played by `expo-video`.
 
 ## Project layout
@@ -73,7 +73,7 @@ src/
 ## Next steps
 
 - [ ] Stand up Postgres + zero-cache, set `EXPO_PUBLIC_ZERO_SERVER`.
-- [ ] Build the Go backend: `/auth/anonymous`, account-linking, Zero push endpoint.
+- [ ] Build out `apps/server` (TypeScript/Hono): `/auth/anonymous`, account-linking, Zero push endpoint.
 - [ ] Swap `SAMPLE_VIDEOS` for `useFeedQuery(...)` (see `src/lib/zero/queries.ts`).
 - [ ] Pick video infra (Mux / Cloudflare Stream / self-hosted) and populate `video.hlsUrl`.
 - [ ] Add Sign in with Apple (required by App Store when offering Google login).

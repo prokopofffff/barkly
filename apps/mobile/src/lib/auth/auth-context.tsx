@@ -18,7 +18,8 @@ import {
  * so all their Zero-synced progress carries over.
  *
  * The network calls here are stubbed. In production each method should hit the
- * Go backend, which owns identity + issues the JWT that Zero uses as `auth`:
+ * TypeScript/Hono backend, which owns identity + issues the JWT that Zero uses
+ * as `auth` (see docs/BACKEND_PLAN.md):
  *   POST /auth/anonymous            -> { userID, token }
  *   POST /auth/link/email           -> { userID, token }   (same userID)
  *   POST /auth/link/apple|google    -> { userID, token }
