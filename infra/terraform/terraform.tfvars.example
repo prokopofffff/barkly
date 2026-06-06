@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+# Values below match the current `yc config list`.
+
+cloud_id  = "b1gvt4hpha6r20imaum3"
+folder_id = "b1gocg7jt54i0v8ducqm"
+zone      = "ru-central1-a"
+region    = "ru-central1"
+
+project = "barkly"
+
+# Must be globally unique across all Yandex Object Storage.
+media_bucket_name = "barkly-media"
+
+# yc_token is optional — leave unset to use the `yc` CLI / YC_TOKEN env var.
+# yc_token = "y0__..."
