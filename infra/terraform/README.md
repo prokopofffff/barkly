@@ -1,12 +1,18 @@
 # Infrastructure — Yandex Cloud (Terraform)
 
-Provisions the base cloud infrastructure for Barkly / ГАВ:
+Provisions the cloud infrastructure for Barkly / ГАВ:
 
-| Resource | What it is |
-|----------|-----------|
-| `yandex_vpc_address.static` | Reserved **static public IPv4** address |
-| `yandex_storage_bucket.media` | **S3-compatible Object Storage** bucket for media (private, versioned, encrypted) |
-| `yandex_iam_service_account.storage` + static key | SA scoped to `storage.editor` that owns the bucket and provides S3 keys for the backend |
+| Service | Resource(s) | What it is |
+|---------|-------------|-----------|
+| **Object Storage** | `yandex_storage_bucket.media` (+ storage SA + static key) | S3-compatible bucket for video/subs/posters (private, versioned, CORS) |
+| **VPC** | `yandex_vpc_network` / `_subnet` / `_address.static` / 2× `_security_group` | Network, subnet, reserved static public IPv4, firewall rules |
+| **Compute Cloud** | `yandex_compute_instance.worker` (+ worker SA) | Ingestion worker (yt-dlp + **ffmpeg**), gets the static IP, SA-auth to the bucket |
+| **Managed PostgreSQL** | `yandex_mdb_postgresql_cluster.main` (+ db + user) | Postgres + Zero sync; logical replication on by default, `mdb_replication` user |
+| **Cloud CDN** | `yandex_cdn_resource` / `_origin_group` | Media delivery in front of the bucket — **opt-in** (set `cdn_cname`) |
+
+> **No managed transcoder.** Yandex has no AWS-MediaConvert equivalent that writes
+> HLS back to your bucket (Yandex Cloud Video is a closed hosting platform). So
+> ffmpeg runs in the Compute worker, next to yt-dlp.
 
 Docs: https://yandex.cloud/en/docs/terraform/
 
@@ -49,6 +55,21 @@ S3_BUCKET=barkly-media
 S3_ACCESS_KEY_ID=<terraform output -raw storage_access_key>
 S3_SECRET_ACCESS_KEY=<terraform output -raw storage_secret_key>
 ```
+
+## Per-service notes
+
+- **Compute worker** — set `ssh_public_key_path` to a key you hold; you log in as
+  `barkly@<static-ip>`. cloud-init installs `ffmpeg`, `yt-dlp`, and `yc`. The
+  instance authenticates to the bucket via its attached service account (IAM
+  token from metadata) — no S3 keys on the box.
+- **Managed PostgreSQL** — `pg_password` is **required** for apply (set it in
+  `terraform.tfvars`). Connect via `terraform output pg_connection_uri`
+  (port 6432, `sslmode=require`). Logical replication is on by default; the app
+  user has `mdb_replication` for Zero's CDC. Keep `pg_public_access = false`
+  unless you need to reach it from outside the VPC.
+- **Cloud CDN** — disabled until you set `cdn_cname` to a domain you control.
+  Before the first apply with CDN: activate the provider once
+  (Console → CDN → "Connect CDN provider"), then point a DNS CNAME at the CDN.
 
 ## Remote state (recommended, after first apply)
 
