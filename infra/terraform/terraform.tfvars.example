@@ -1,8 +1,8 @@
 # Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
 # Values below match the current `yc config list`.
 
-cloud_id  = "b1gvt4hpha6r20imaum3"
-folder_id = "b1gocg7jt54i0v8ducqm"
+cloud_id  = "b1g3vcmen9pj1u62kdfk" # cloud-barkly-mobile
+folder_id = "b1gt5cn16o6uapr6u2e1"
 zone      = "ru-central1-a"
 region    = "ru-central1"
 
