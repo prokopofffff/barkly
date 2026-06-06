@@ -1,0 +1,114 @@
+name: Terraform (infra)
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+      - ".github/actions/tf-setup/**"
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+      - ".github/actions/tf-setup/**"
+
+# Cancel superseded PR plans, but never cancel an in-flight apply on main.
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Non-secret cloud coordinates (set as repository variables).
+  TF_VAR_cloud_id: ${{ vars.YC_CLOUD_ID }}
+  TF_VAR_folder_id: ${{ vars.YC_FOLDER_ID }}
+  # Required by the app DB user.
+  TF_VAR_pg_password: ${{ secrets.PG_PASSWORD }}
+  # Optional: set the repo variable YC_CDN_CNAME to enable Cloud CDN.
+  TF_VAR_cdn_cname: ${{ vars.YC_CDN_CNAME }}
+  # State-bucket credentials for the S3 backend (used by every terraform command).
+  AWS_ACCESS_KEY_ID: ${{ secrets.TF_STATE_S3_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_S3_SECRET_KEY }}
+
+jobs:
+  plan:
+    name: plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform + auth
+        uses: ./.github/actions/tf-setup
+        with:
+          yc_sa_key_json: ${{ secrets.YC_SA_KEY_JSON }}
+          state_s3_access_key: ${{ secrets.TF_STATE_S3_ACCESS_KEY }}
+          state_s3_secret_key: ${{ secrets.TF_STATE_S3_SECRET_KEY }}
+          worker_ssh_public_key: ${{ secrets.WORKER_SSH_PUBLIC_KEY }}
+
+      - name: Format check
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Validate
+        working-directory: infra/terraform
+        run: terraform validate -no-color
+
+      - name: Plan
+        id: plan
+        working-directory: infra/terraform
+        run: terraform plan -input=false -no-color -lock-timeout=5m
+
+      - name: Comment plan on PR
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+          OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const body = `### Terraform Plan \`${process.env.OUTCOME}\`
+            <details><summary>Show plan</summary>
+
+            \`\`\`hcl
+            ${(process.env.PLAN || '').slice(0, 60000)}
+            \`\`\`
+            </details>
+
+            *Applied automatically on merge to \`main\`.*`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const marker = '### Terraform Plan';
+            const existing = comments.find(c => c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+
+  apply:
+    name: apply
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Gate on a protected environment so applies can require manual approval.
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform + auth
+        uses: ./.github/actions/tf-setup
+        with:
+          yc_sa_key_json: ${{ secrets.YC_SA_KEY_JSON }}
+          state_s3_access_key: ${{ secrets.TF_STATE_S3_ACCESS_KEY }}
+          state_s3_secret_key: ${{ secrets.TF_STATE_S3_SECRET_KEY }}
+          worker_ssh_public_key: ${{ secrets.WORKER_SSH_PUBLIC_KEY }}
+
+      - name: Apply
+        working-directory: infra/terraform
+        run: terraform apply -input=false -no-color -auto-approve -lock-timeout=5m

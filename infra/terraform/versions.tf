@@ -8,19 +8,21 @@ terraform {
     }
   }
 
-  # Remote state lives in the very bucket this config creates, so the backend is
-  # commented out for the first `apply`. After the bucket exists, fill in the
-  # access/secret keys (see README "Remote state") and run `terraform init -migrate-state`.
-  #
-  # backend "s3" {
-  #   endpoints = { s3 = "https://storage.yandexcloud.net" }
-  #   bucket    = "barkly-tfstate"
-  #   region    = "ru-central1"
-  #   key       = "infra/terraform.tfstate"
-  #
-  #   skip_region_validation      = true
-  #   skip_credentials_validation = true
-  #   skip_requesting_account_id  = true
-  #   skip_s3_checksum            = true
-  # }
+  # Remote state in a dedicated Object Storage bucket so CI (plan on PR, apply on
+  # merge) shares one state. Credentials come from AWS_ACCESS_KEY_ID /
+  # AWS_SECRET_ACCESS_KEY env vars (a static access key for the state bucket) —
+  # never hard-code them here. The state bucket is created once during bootstrap
+  # (see README "Bootstrap the state bucket"), separate from the media bucket.
+  backend "s3" {
+    endpoints = { s3 = "https://storage.yandexcloud.net" }
+    bucket    = "barkly-tfstate"
+    region    = "ru-central1"
+    key       = "infra/terraform.tfstate"
+
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_requesting_account_id  = true
+    skip_s3_checksum            = true
+    skip_metadata_api_check     = true
+  }
 }

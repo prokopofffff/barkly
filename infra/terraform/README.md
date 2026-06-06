@@ -71,26 +71,74 @@ S3_SECRET_ACCESS_KEY=<terraform output -raw storage_secret_key>
   Before the first apply with CDN: activate the provider once
   (Console → CDN → "Connect CDN provider"), then point a DNS CNAME at the CDN.
 
-## Remote state (recommended, after first apply)
+## Remote state (S3 backend)
 
-State currently lives in a **local** `terraform.tfstate` and contains the S3
-secret key — it is gitignored. To move state into the bucket itself:
+State lives in a dedicated **`barkly-tfstate`** Object Storage bucket (configured
+in `versions.tf`) so local runs and CI share one state. Backend credentials come
+from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars — a static access key
+scoped to that bucket (never committed).
 
-1. Uncomment the `backend "s3"` block in `versions.tf` (adjust `bucket`/`key`).
-2. Create AWS-style env vars from the static key:
-   ```bash
-   export AWS_ACCESS_KEY_ID=$(terraform output -raw storage_access_key)
-   export AWS_SECRET_ACCESS_KEY=$(terraform output -raw storage_secret_key)
-   ```
-3. `terraform init -migrate-state`
+For local validation without the backend: `terraform init -backend=false`.
+
+### Bootstrap the state bucket (one-time)
+
+The state bucket must exist before the first `terraform init`. It is *not*
+managed by this config (chicken-and-egg). Create it once with the `yc` CLI:
+
+```bash
+# 1. Service account that owns Terraform state + the static key for the backend.
+yc iam service-account create --name barkly-tf-state
+yc resource-manager folder add-access-binding --id "$(yc config get folder-id)" \
+  --role storage.editor --subject "serviceAccount:$(yc iam service-account get barkly-tf-state --format json | jq -r .id)"
+
+# 2. The state bucket.
+yc storage bucket create --name barkly-tfstate
+
+# 3. Static access key for the S3 backend (store the output as CI secrets).
+yc iam access-key create --service-account-name barkly-tf-state
+```
+
+## CI/CD (GitHub Actions)
+
+`.github/workflows/terraform.yml`:
+
+- **Pull request** touching `infra/terraform/**` → `fmt -check`, `validate`,
+  `plan`, and the plan is posted/updated as a PR comment.
+- **Push to `main`** → `terraform apply -auto-approve`, gated on the
+  **`production`** GitHub Environment (add required reviewers there for a manual
+  approval step before anything is created/changed).
+
+### Required configuration
+
+Repository **Variables** (Settings → Secrets and variables → Actions → Variables):
+
+| Variable | Value |
+|----------|-------|
+| `YC_CLOUD_ID` | your cloud id |
+| `YC_FOLDER_ID` | your folder id |
+| `YC_CDN_CNAME` | *(optional)* CDN domain; leave unset to skip CDN |
+
+Repository **Secrets**:
+
+| Secret | What |
+|--------|------|
+| `YC_SA_KEY_JSON` | Authorized-key JSON of a CI service account with `editor` (or scoped) on the folder. Create: `yc iam key create --service-account-name <ci-sa> --output key.json` |
+| `TF_STATE_S3_ACCESS_KEY` / `TF_STATE_S3_SECRET_KEY` | Static key for the `barkly-tfstate` bucket (from bootstrap step 3) |
+| `PG_PASSWORD` | Password for the app DB user (`TF_VAR_pg_password`) |
+| `WORKER_SSH_PUBLIC_KEY` | SSH public key installed on the ingestion worker |
+
+The CI service account needs `editor` (or the union of `vpc.admin`,
+`compute.admin`, `storage.admin`, `mdb.admin`, `iam.serviceAccounts.admin`) to
+manage every resource here.
 
 ## Security notes
 
-- `terraform.tfstate`, `terraform.tfvars`, and `.tfplan` files are gitignored —
-  they contain secrets. Never commit them.
-- The bucket is **private** (`acl = "private"`, anonymous access off). Serve
-  media via signed URLs or a CDN origin, not public ACLs.
-- The service account is scoped to `storage.editor` on this folder only.
+- `terraform.tfstate*`, `terraform.tfvars`, and `*.tfplan` are gitignored and
+  contain secrets — never commit them.
+- The media bucket is **private** (anonymous access off). Serve via signed URLs
+  or the CDN origin, not public ACLs.
+- Service accounts are least-privileged: `storage.editor` for the bucket/worker;
+  the CI SA is the only broad one.
 
 ## Teardown
 
