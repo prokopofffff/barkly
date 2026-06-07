@@ -80,6 +80,19 @@ scoped to that bucket (never committed).
 
 For local validation without the backend: `terraform init -backend=false`.
 
+> **`Invalid provider registry host` / can't reach `registry.terraform.io`?**
+> From networks where HashiCorp's registry is blocked (e.g. RU), install the
+> provider from Yandex's mirror. Create `~/.terraformrc`:
+> ```hcl
+> provider_installation {
+>   network_mirror { url = "https://terraform-mirror.yandexcloud.net/" }
+>   direct { exclude = ["registry.terraform.io/*/*"] }
+> }
+> ```
+> then `terraform init -upgrade` (delete `.terraform.lock.hcl` first if it
+> complains about hashes). CI runners reach the registry directly, so this is a
+> local-only step.
+
 > **`SignatureDoesNotMatch` on `terraform init`?** Two causes: (a) `AWS_ACCESS_KEY_ID`
 > and `AWS_SECRET_ACCESS_KEY` are from different keys — re-export a matching pair
 > (`yc iam access-key list --service-account-name barkly-ci` to check for dupes);
