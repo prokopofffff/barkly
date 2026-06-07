@@ -50,9 +50,12 @@ resource "yandex_compute_instance" "worker" {
     nat_ip_address = yandex_vpc_address.static.external_ipv4_address[0].address
   }
 
+  # The SSH key lives inside user-data (cloud-init `users:`), NOT in a separate
+  # `ssh-keys` metadata key: on Yandex Ubuntu images, when user-data is present
+  # the `ssh-keys` key is ignored, so logins would fail with "Permission denied".
   metadata = {
-    ssh-keys  = "barkly:${file(pathexpand(var.ssh_public_key_path))}"
-    user-data = local.worker_cloud_init
+    user-data          = local.worker_cloud_init
+    serial-port-enable = "1"
   }
 
   labels = local.labels
@@ -61,10 +64,19 @@ resource "yandex_compute_instance" "worker" {
 }
 
 locals {
-  # Installs the transcoding toolchain. App deploy (the worker code) is handled
-  # separately — this just provisions ffmpeg + yt-dlp + the YC CLI.
+  worker_ssh_key = chomp(file(pathexpand(var.ssh_public_key_path)))
+
+  # Creates the `barkly` login (with the SSH key) and installs the transcoding
+  # toolchain. App deploy (the worker code) is handled separately.
   worker_cloud_init = <<-EOT
     #cloud-config
+    users:
+      - name: barkly
+        groups: [sudo]
+        sudo: "ALL=(ALL) NOPASSWD:ALL"
+        shell: /bin/bash
+        ssh_authorized_keys:
+          - ${local.worker_ssh_key}
     package_update: true
     packages:
       - ffmpeg
