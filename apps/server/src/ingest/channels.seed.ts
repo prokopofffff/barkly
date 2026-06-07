@@ -39,9 +39,15 @@ export const channelSeed: readonly ChannelSeed[] = [
   // --- English-learning channels (on-mission, clearest, safest) -------------
   { handle: "@BBCLearningEnglish", topic: "english_learning", trust: 3 },
   { handle: "@EnglishWithLucy", topic: "english_learning", trust: 3 },
-  { handle: "@mmmEnglish", topic: "english_learning", trust: 3 },
   { handle: "@SpeakEnglishWithVanessa", topic: "english_learning", trust: 3 },
   { handle: "@EnglishClass101", topic: "english_learning", trust: 3 },
+  { handle: "@PapaTeachMe", topic: "english_learning", trust: 3 },
+  {
+    handle: "@linguamarina",
+    topic: "english_learning",
+    trust: 3,
+    notes: "English learning + lifestyle vlogs",
+  },
 
   // --- Technology / reviews -------------------------------------------------
   { handle: "@mkbhd", topic: "technology", trust: 2 },
@@ -75,28 +81,15 @@ export const channelSeed: readonly ChannelSeed[] = [
 
   // --- Daily life / vlogs ---------------------------------------------------
   {
-    handle: "@caseyneistat",
+    handle: "@casey",
     topic: "daily_life",
     trust: 1,
-    notes: "fast speech — advanced level",
+    notes: "Casey Neistat — fast speech, advanced level",
   },
 
   // --- Workplace / corporate humor (clean skits) ----------------------------
   { handle: "@CorporateNatalie", topic: "workplace_conversations", trust: 2 },
-  {
-    handle: "@corporate.bro",
-    topic: "workplace_conversations",
-    trust: 1,
-    notes: "verify handle",
-  },
-
-  // --- Relationship (coaching, no sexual content) ---------------------------
-  {
-    handle: "@matthewhussey",
-    topic: "relationship_conversations",
-    trust: 1,
-    notes: "relationship coaching — LLM gate must confirm no sexual content",
-  },
+  { handle: "@corporatebro", topic: "workplace_conversations", trust: 1 },
 
   // --- Movies / TV clips ----------------------------------------------------
   {
@@ -120,7 +113,8 @@ export const channelSeed: readonly ChannelSeed[] = [
     notes: "comedy skits — LLM gate must confirm clean; verify handle",
   },
 
-  // NOTE: street_interviews is intentionally left for hand-curation. The genre
-  // drifts into socio-political / dating content; pick specific safe channels
-  // by hand rather than auto-seeding.
+  // NOTE: street_interviews and relationship_conversations are intentionally
+  // left for hand-curation. Both genres drift into socio-political / dating /
+  // sexual content (and many relationship channels have no Shorts tab); pick
+  // specific safe channels by hand rather than auto-seeding.
 ];
