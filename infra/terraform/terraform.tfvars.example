@@ -1,0 +1,32 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+# Values below match the current `yc config list`.
+
+cloud_id  = "b1g3vcmen9pj1u62kdfk" # cloud-barkly-mobile
+folder_id = "b1gt5cn16o6uapr6u2e1"
+zone      = "ru-central1-a"
+region    = "ru-central1"
+
+project = "barkly"
+
+# Must be globally unique across all Yandex Object Storage.
+media_bucket_name = "barkly-media"
+
+# --- Compute worker ---
+# SSH public key installed on the worker (user 'barkly').
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+
+# --- Cloud CDN ---
+# Leave empty to skip CDN. Requires a domain you control + CDN provider activated.
+# cdn_cname = "cdn.barkly.app"
+
+# --- Managed PostgreSQL ---
+pg_version         = "16"
+pg_resource_preset = "s2.micro"
+pg_disk_gb         = 20
+pg_database        = "barkly"
+pg_user            = "barkly"
+pg_password        = "CHANGE_ME_strong_password"   # required for apply
+pg_public_access   = false
+
+# yc_token is optional — leave unset to use the `yc` CLI / YC_TOKEN env var.
+# yc_token = "y0__..."

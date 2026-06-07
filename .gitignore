@@ -37,3 +37,8 @@ yarn-debug.*
 yarn-error.*
 .DS_Store
 *.pem
+
+# Terraform — never commit vars/state/secrets (belt-and-suspenders for the repo root)
+*.tfvars
+*.tfstate
+*.tfstate.*
