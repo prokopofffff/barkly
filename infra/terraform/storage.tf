@@ -5,10 +5,12 @@ resource "yandex_iam_service_account" "storage" {
   description = "Owns the media Object Storage bucket and its static access keys."
 }
 
-# Allow the SA to manage objects/buckets in this folder.
-resource "yandex_resourcemanager_folder_iam_member" "storage_editor" {
+# storage.admin (not editor) is required: Terraform configures bucket-level
+# settings (versioning, CORS, lifecycle, policy) via the S3 API, and those
+# operations are denied to storage.editor.
+resource "yandex_resourcemanager_folder_iam_member" "storage_admin" {
   folder_id = var.folder_id
-  role      = "storage.editor"
+  role      = "storage.admin"
   member    = "serviceAccount:${yandex_iam_service_account.storage.id}"
 }
 
@@ -53,5 +55,5 @@ resource "yandex_storage_bucket" "media" {
   # (requires granting the SA `kms.keys.encrypterDecrypter`).
 
   # IAM binding must exist before the SA can create the bucket.
-  depends_on = [yandex_resourcemanager_folder_iam_member.storage_editor]
+  depends_on = [yandex_resourcemanager_folder_iam_member.storage_admin]
 }
