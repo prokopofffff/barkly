@@ -37,6 +37,14 @@ runs:
         mkdir -p "$HOME/.ssh"
         printf '%s\n' '${{ inputs.worker_ssh_public_key }}' > "$HOME/.ssh/id_ed25519.pub"
 
+    - name: S3 backend compatibility (Yandex Object Storage)
+      shell: bash
+      run: |
+        # The aws-sdk in recent Terraform adds checksum headers that Yandex's S3
+        # rejects with SignatureDoesNotMatch. Opt out for all later steps.
+        echo "AWS_REQUEST_CHECKSUM_CALCULATION=when_required" >> "$GITHUB_ENV"
+        echo "AWS_RESPONSE_CHECKSUM_VALIDATION=when_required" >> "$GITHUB_ENV"
+
     - name: terraform init (remote state)
       shell: bash
       working-directory: infra/terraform

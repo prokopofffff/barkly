@@ -80,6 +80,13 @@ scoped to that bucket (never committed).
 
 For local validation without the backend: `terraform init -backend=false`.
 
+> **`SignatureDoesNotMatch` on `terraform init`?** Two causes: (a) `AWS_ACCESS_KEY_ID`
+> and `AWS_SECRET_ACCESS_KEY` are from different keys — re-export a matching pair
+> (`yc iam access-key list --service-account-name barkly-ci` to check for dupes);
+> (b) recent Terraform's aws-sdk sends checksum headers Yandex rejects — export
+> `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` and
+> `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (CI sets these automatically).
+
 ### Bootstrap the state bucket (one-time)
 
 The state bucket must exist before the first `terraform init`. It is *not*
