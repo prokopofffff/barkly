@@ -29,13 +29,16 @@ cd infra/terraform
 
 cp terraform.tfvars.example terraform.tfvars   # values prefilled from `yc config`
 
+export YC_TOKEN="$(yc iam create-token)"        # provider auth (see below)
 terraform init       # downloads the yandex provider
 terraform plan        # review what will be created
 terraform apply       # create the resources
 ```
 
-Authentication: by default the provider uses the `yc` CLI / `YC_TOKEN` env var.
-To pin an explicit token instead, set `yc_token` in `terraform.tfvars` (sensitive).
+Authentication: the provider does **not** read the `yc` CLI config — give it a
+token via the `YC_TOKEN` env var (`export YC_TOKEN="$(yc iam create-token)"`,
+valid ~12h) or a service-account key via `YC_SERVICE_ACCOUNT_KEY_FILE`. To pin
+an explicit token instead, set `yc_token` in `terraform.tfvars` (sensitive).
 
 ## Outputs
 
