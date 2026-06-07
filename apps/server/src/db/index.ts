@@ -3,7 +3,10 @@ import postgres from "postgres";
 import { config } from "@/lib/config";
 import * as schema from "@/db/schema";
 import * as authSchema from "@/db/auth-schema";
+import * as ingestSchema from "@/db/ingest-schema";
 
 const client = postgres(config.DATABASE_URL);
 
-export const db = drizzle(client, { schema: { ...schema, ...authSchema } });
+export const db = drizzle(client, {
+  schema: { ...schema, ...authSchema, ...ingestSchema },
+});
