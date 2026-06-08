@@ -68,26 +68,27 @@ export function parseVtt(content: string): ParsedTranscript {
     if (text) segments.push({ start, end, text });
   }
 
-  // De-duplicate the rolling repeats auto-captions emit. They typically grow a
-  // line word by word across overlapping cues ("so", "so today", "so today we"),
-  // so collapse a run where each cue extends the previous one, and drop cues
-  // that are a shorter prefix of what we already kept.
-  const kept: string[] = [];
+  // YouTube auto-captions roll a two-line window: each cue repeats the previous
+  // line and adds the next, so naive concatenation doubles every word. Merge
+  // cues by the maximal WORD overlap between the end of the accumulated
+  // transcript and the start of the next cue, appending only the new suffix.
+  const acc: string[] = [];
   for (const seg of segments) {
-    const t = seg.text;
-    const last = kept.at(-1);
-    if (last === undefined) {
-      kept.push(t);
-    } else if (t === last || `${last} `.startsWith(`${t} `)) {
-      // exact repeat, or t is a prefix of last -> redundant
-      continue;
-    } else if (`${t} `.startsWith(`${last} `)) {
-      kept[kept.length - 1] = t; // t extends last -> keep the longer
-    } else {
-      kept.push(t);
+    const words = seg.text.split(/\s+/).filter(Boolean);
+    if (words.length === 0) continue;
+    const maxOverlap = Math.min(acc.length, words.length);
+    let overlap = 0;
+    for (let k = maxOverlap; k > 0; k--) {
+      const tail = acc.slice(acc.length - k).join(" ").toLowerCase();
+      const head = words.slice(0, k).join(" ").toLowerCase();
+      if (tail === head) {
+        overlap = k;
+        break;
+      }
     }
+    for (let i = overlap; i < words.length; i++) acc.push(words[i]!);
   }
-  const text = kept.join(" ").replace(/\s+/g, " ").trim();
+  const text = acc.join(" ").replace(/\s+/g, " ").trim();
 
   const wordCount = text ? text.split(/\s+/).length : 0;
   return { segments, text, quality: qualityOf(text, wordCount) };
