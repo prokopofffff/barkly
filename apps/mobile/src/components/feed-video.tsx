@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,7 @@ import { Icon } from '@/components/icon';
 import { Sharik } from '@/components/mascot';
 import { RailButton } from '@/components/rail-button';
 import { StreakBadge } from '@/components/streak-badge';
+import { YouTubeShort } from '@/components/youtube-short';
 import { COLORS, GRADIENTS } from '@/constants/gav';
 import type { FeedVideoItem, SubtitleToken } from '@/lib/feed/sample-videos';
 
@@ -57,6 +58,7 @@ export function FeedVideo({
   onOpenVocab,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [following, setFollowing] = useState(false);
@@ -64,7 +66,8 @@ export function FeedVideo({
   const [floats, setFloats] = useState<FloatItem[]>([]);
   const [nudge, setNudge] = useState(false);
 
-  const player = useVideoPlayer(item.hlsUrl, (p) => {
+  // No expo-video source for embedded YouTube clips — they play via YouTubeShort.
+  const player = useVideoPlayer(item.youtubeId ? null : item.hlsUrl, (p) => {
     p.loop = true;
     p.muted = false;
   });
@@ -140,8 +143,13 @@ export function FeedVideo({
         </Text>
       </View>
 
-      {/* the real clip on top of the placeholder */}
-      <VideoView style={StyleSheet.absoluteFill} player={player} contentFit="cover" nativeControls={false} />
+      {/* the real clip on top of the placeholder — embedded YouTube when the
+          row carries a youtubeId, otherwise the self-hosted/HLS player */}
+      {item.youtubeId ? (
+        <YouTubeShort videoId={item.youtubeId} playing={isActive} width={width} height={height} />
+      ) : (
+        <VideoView style={StyleSheet.absoluteFill} player={player} contentFit="cover" nativeControls={false} />
+      )}
 
       {/* legibility scrim */}
       <LinearGradient

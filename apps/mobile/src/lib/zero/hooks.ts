@@ -27,6 +27,7 @@ function mapVideoRow(v: Video): FeedVideoItem {
     subtitle: [...v.subtitle],
     quiz: v.quiz,
     hlsUrl: v.hlsUrl,
+    youtubeId: v.youtubeId ?? undefined,
   };
 }
 
