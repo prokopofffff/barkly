@@ -3,7 +3,9 @@ import { runClassify } from "@/ingest/classify";
 import { runDifficulty } from "@/ingest/difficulty";
 import { discoverAll } from "@/ingest/discover";
 import { runFeatures } from "@/ingest/features";
+import { runLesson } from "@/ingest/lesson";
 import { runPrefilter } from "@/ingest/prefilter";
+import { runPromote } from "@/ingest/promote";
 import { runTranscribe } from "@/ingest/transcribe";
 
 // Pipeline orchestrator (bk-z5t.11). The per-stage runners are already a
@@ -73,9 +75,20 @@ export async function runPipeline(
       name: "difficulty",
       run: async () => (await runDifficulty({ limit: opts.batch, persist: true })).length,
     });
+    stages.push({
+      name: "lesson",
+      run: async () =>
+        (await runLesson({ limit: opts.batch, delayMs: opts.delayMs, persist: true }))
+          .length,
+    });
   } else {
-    log("ANTHROPIC_API_KEY not set — skipping classify + difficulty");
+    log("ANTHROPIC_API_KEY not set — skipping classify + difficulty + lesson");
   }
+  // Promote needs no key; it runs last so quizzed clips land in `video`.
+  stages.push({
+    name: "promote",
+    run: async () => (await runPromote({ limit: opts.batch, persist: true })).length,
+  });
 
   const totals: Record<string, number> = {};
   for (let round = 1; round <= opts.rounds; round++) {
