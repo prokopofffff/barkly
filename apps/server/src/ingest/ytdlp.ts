@@ -124,6 +124,7 @@ export type VideoMeta = {
   readonly likes: number | null;
   readonly comments: number | null;
   readonly language: string | null; // yt-dlp's guess, when present
+  readonly embeddable: boolean; // playable_in_embed — required for the embed feed
   readonly manualCaptionLangs: readonly string[]; // creator-uploaded captions
   readonly autoCaptionLangs: readonly string[]; // ASR captions
 };
@@ -154,6 +155,8 @@ export function parseVideoMeta(json: string): VideoMeta {
     likes: asNumber(r.like_count),
     comments: asNumber(r.comment_count),
     language: asString(r.language),
+    // Default to embeddable unless YouTube explicitly says otherwise.
+    embeddable: r.playable_in_embed !== false,
     manualCaptionLangs: langKeys(r.subtitles),
     autoCaptionLangs: langKeys(r.automatic_captions),
   };
@@ -243,4 +246,34 @@ export async function downloadVideo(
     videoPath: join(dir, video),
     subPath: sub ? join(dir, sub) : null,
   };
+}
+
+// --- subtitle-only fetch (embed path, bk-z5t.7) ------------------------------
+
+/** Args to fetch ONLY the English subtitle (no video) for the embed pipeline. */
+export function subtitleDownloadArgs(
+  id: string,
+  outTemplate: string,
+  source: CaptionSource,
+): string[] {
+  return [
+    "--skip-download",
+    ...subFlags(source),
+    "-o",
+    outTemplate,
+    "--no-playlist",
+    "--no-warnings",
+    watchUrl(id),
+  ];
+}
+
+/** Download the English .vtt (no video) into `dir`; return its path or null. */
+export async function fetchSubtitles(
+  id: string,
+  source: CaptionSource,
+  dir: string,
+): Promise<string | null> {
+  await runYtDlp(subtitleDownloadArgs(id, join(dir, "%(id)s.%(ext)s"), source));
+  const sub = pickEnglishVtt(id, await readdir(dir));
+  return sub ? join(dir, sub) : null;
 }

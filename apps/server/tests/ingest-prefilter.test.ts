@@ -12,6 +12,7 @@ const base: PrefilterInput = {
   title: "How to cook the perfect omelette",
   description: "A quick breakfast tutorial.",
   durationS: 45,
+  embeddable: true,
   manualCaptionLangs: ["en"],
   autoCaptionLangs: ["en", "es"],
 };
@@ -48,6 +49,10 @@ describe("evaluatePrefilter", () => {
   test("keeps a clean English short", () => {
     const v = evaluatePrefilter(base);
     expect(v).toEqual({ ok: true, captionSource: "manual", langCode: "en" });
+  });
+  test("drops a non-embeddable video", () => {
+    const v = evaluatePrefilter({ ...base, embeddable: false });
+    expect(v).toMatchObject({ ok: false, reason: "not_embeddable" });
   });
   test("drops on denylist before other checks", () => {
     const v = evaluatePrefilter({ ...base, title: "My honest take on the election" });
@@ -92,5 +97,10 @@ describe("parseVideoMeta", () => {
     expect(m.comments).toBeNull();
     expect(m.manualCaptionLangs).toEqual(["en", "es"]);
     expect(m.autoCaptionLangs).toEqual(["en", "fr"]);
+    expect(m.embeddable).toBe(true); // absent -> assumed embeddable
+  });
+  test("respects playable_in_embed=false", () => {
+    const m = parseVideoMeta(JSON.stringify({ id: "x", playable_in_embed: false }));
+    expect(m.embeddable).toBe(false);
   });
 });

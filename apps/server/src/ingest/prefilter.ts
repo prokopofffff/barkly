@@ -64,6 +64,7 @@ export type PrefilterInput = {
   readonly title: string;
   readonly description: string;
   readonly durationS: number | null;
+  readonly embeddable: boolean; // playable_in_embed — required for the embed feed
   readonly manualCaptionLangs: readonly string[];
   readonly autoCaptionLangs: readonly string[];
 };
@@ -83,6 +84,11 @@ export function evaluatePrefilter(input: PrefilterInput): PrefilterVerdict {
   );
   const langCode = captionSource !== "none" ? "en" : null;
   const text = `${input.title}\n${input.description}`;
+
+  // Embed feed: a video the creator blocked from embedding is unusable.
+  if (!input.embeddable) {
+    return { ok: false, reason: "not_embeddable", captionSource, langCode };
+  }
 
   const banned = matchesDenylist(text);
   if (banned) {
@@ -167,6 +173,7 @@ export async function runPrefilter(
       title: meta.title || row.title,
       description: meta.description,
       durationS: meta.durationS ?? row.durationS,
+      embeddable: meta.embeddable,
       manualCaptionLangs: meta.manualCaptionLangs,
       autoCaptionLangs: meta.autoCaptionLangs,
     });

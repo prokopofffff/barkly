@@ -17,6 +17,7 @@
     "ingest:discover": "bun run src/ingest/discover.cli.ts",
     "ingest:prefilter": "bun run src/ingest/prefilter.cli.ts",
     "ingest:download": "bun run src/ingest/download.cli.ts",
+    "ingest:transcribe": "bun run src/ingest/transcribe.cli.ts",
     "zero:generate": "drizzle-zero generate -s src/db/schema.ts -o ../../packages/zero/src/schema.gen.ts --enable-legacy-queries --suppress-defaults-warning -f",
     "zero:deploy-perms": "zero-deploy-permissions -p src/zero/schema-config.ts",
     "prepare": "git config core.hooksPath .githooks || true"
