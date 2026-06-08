@@ -27,7 +27,8 @@ import {
 // Drives a resumable state machine; the orchestrator advances rows stage by
 // stage and can re-run idempotently from wherever a row stalled.
 export type IngestStatus =
-  | "discovered" // metadata harvested from YouTube
+  | "discovered" // metadata harvested from YouTube (flat list only)
+  | "prefiltered" // passed the cheap no-LLM filter; full metadata enriched
   | "prefiltered_out" // dropped by the cheap no-LLM filter
   | "downloaded" // video + subs pulled, transcoded, uploaded to Object Storage
   | "transcribed" // captions normalized into the transcript table

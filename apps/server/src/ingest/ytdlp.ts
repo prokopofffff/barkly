@@ -107,3 +107,62 @@ export async function fetchChannelShorts(
   ]);
   return parseChannelShorts(out);
 }
+
+// --- full single-video metadata (the pre-filter / download input) ------------
+
+export type VideoMeta = {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly durationS: number | null;
+  readonly uploadDate: string | null; // YYYYMMDD as yt-dlp reports it
+  readonly tags: readonly string[]; // usually empty via yt-dlp
+  readonly views: number | null;
+  readonly likes: number | null;
+  readonly comments: number | null;
+  readonly language: string | null; // yt-dlp's guess, when present
+  readonly manualCaptionLangs: readonly string[]; // creator-uploaded captions
+  readonly autoCaptionLangs: readonly string[]; // ASR captions
+};
+
+export function watchUrl(id: string): string {
+  return `https://www.youtube.com/watch?v=${id}`;
+}
+
+function langKeys(v: unknown): string[] {
+  return v && typeof v === "object" ? Object.keys(v as object) : [];
+}
+
+function stringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** Parse the JSON from `yt-dlp -J <video>` into normalized metadata. */
+export function parseVideoMeta(json: string): VideoMeta {
+  const r = JSON.parse(json) as Record<string, unknown>;
+  return {
+    id: asString(r.id) ?? "",
+    title: asString(r.title) ?? "",
+    description: asString(r.description) ?? "",
+    durationS: asNumber(r.duration),
+    uploadDate: asString(r.upload_date),
+    tags: stringArray(r.tags),
+    views: asNumber(r.view_count),
+    likes: asNumber(r.like_count),
+    comments: asNumber(r.comment_count),
+    language: asString(r.language),
+    manualCaptionLangs: langKeys(r.subtitles),
+    autoCaptionLangs: langKeys(r.automatic_captions),
+  };
+}
+
+/** Fetch full metadata for a single video (no download). */
+export async function fetchVideoMeta(id: string): Promise<VideoMeta> {
+  const out = await runYtDlp([
+    "-J",
+    "--no-playlist",
+    "--no-warnings",
+    watchUrl(id),
+  ]);
+  return parseVideoMeta(out);
+}
