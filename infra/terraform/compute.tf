@@ -1,6 +1,7 @@
 # --- Ingestion worker service account -----------------------------------------
-# The instance authenticates to Object Storage via its attached SA (IAM token
-# from metadata) — no static keys live on the box.
+# storage.editor = read + WRITE objects (what uploads need). The worker uses the
+# static key below for the S3 API (Object Storage doesn't accept IAM tokens) —
+# its own least-privilege key, not the bucket-admin storage key.
 
 resource "yandex_iam_service_account" "worker" {
   name        = "${var.project}-worker-sa"
@@ -11,6 +12,12 @@ resource "yandex_resourcemanager_folder_iam_member" "worker_storage" {
   folder_id = var.folder_id
   role      = "storage.editor"
   member    = "serviceAccount:${yandex_iam_service_account.worker.id}"
+}
+
+# S3 static key the worker uses to upload to the media bucket.
+resource "yandex_iam_service_account_static_access_key" "worker" {
+  service_account_id = yandex_iam_service_account.worker.id
+  description        = "Worker uploads to ${var.media_bucket_name}"
 }
 
 # --- Boot image ---------------------------------------------------------------

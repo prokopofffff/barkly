@@ -52,6 +52,18 @@ output "worker_internal_ip" {
   value       = yandex_compute_instance.worker.network_interface[0].ip_address
 }
 
+output "worker_s3_access_key" {
+  description = "S3 access key id for the worker SA (object read/write). Use for uploads."
+  value       = yandex_iam_service_account_static_access_key.worker.access_key
+  sensitive   = true
+}
+
+output "worker_s3_secret_key" {
+  description = "S3 secret key for the worker SA. terraform output -raw worker_s3_secret_key"
+  value       = yandex_iam_service_account_static_access_key.worker.secret_key
+  sensitive   = true
+}
+
 # --- CDN -----------------------------------------------------------------------
 
 output "cdn_cname" {
