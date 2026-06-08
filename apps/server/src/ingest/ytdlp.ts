@@ -1,5 +1,8 @@
 import { execFile } from "node:child_process";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
+import type { CaptionSource } from "@/db/ingest-schema";
 
 // Thin yt-dlp wrapper for discovery (bk-z5t.4) — no YouTube Data API, no key,
 // no quota. The subprocess call is isolated from the pure parsers below so the
@@ -165,4 +168,79 @@ export async function fetchVideoMeta(id: string): Promise<VideoMeta> {
     watchUrl(id),
   ]);
   return parseVideoMeta(out);
+}
+
+// --- media download (bk-z5t.6) ----------------------------------------------
+
+/** Caption flag matching the source we recorded at pre-filter time: pull the
+ * manual track when we have one, else the ASR track. */
+function subFlags(source: CaptionSource): string[] {
+  const common = [
+    "--sub-langs",
+    "en.*,en",
+    "--sub-format",
+    "vtt/best",
+    "--convert-subs",
+    "vtt",
+  ];
+  if (source === "manual") return ["--write-subs", ...common];
+  if (source === "auto") return ["--write-auto-subs", ...common];
+  return [];
+}
+
+/** Args for downloading the video (merged to mp4) + its English subtitle. */
+export function videoDownloadArgs(
+  id: string,
+  outTemplate: string,
+  source: CaptionSource,
+): string[] {
+  return [
+    "-f",
+    "bv*+ba/b",
+    "--merge-output-format",
+    "mp4",
+    "-o",
+    outTemplate,
+    "--no-playlist",
+    "--no-warnings",
+    ...subFlags(source),
+    watchUrl(id),
+  ];
+}
+
+/** Pick the English .vtt yt-dlp produced for a video, preferring a plain
+ * `<id>.en.vtt` over regional/auto variants. */
+export function pickEnglishVtt(id: string, files: readonly string[]): string | null {
+  const vtts = files.filter(
+    (f) => f.startsWith(`${id}.`) && f.toLowerCase().endsWith(".vtt"),
+  );
+  const en = vtts.filter((f) => /\.en\b/i.test(f) || /\.en[.-]/i.test(f));
+  const pool = en.length > 0 ? en : [];
+  return (
+    pool.find((f) => /^.*\.en\.vtt$/i.test(f)) ?? pool[0] ?? null
+  );
+}
+
+export type DownloadedFiles = {
+  readonly videoPath: string;
+  readonly subPath: string | null;
+};
+
+/** Download a video + English subs into `dir`; return the produced paths. */
+export async function downloadVideo(
+  id: string,
+  source: CaptionSource,
+  dir: string,
+): Promise<DownloadedFiles> {
+  await runYtDlp(videoDownloadArgs(id, join(dir, "%(id)s.%(ext)s"), source));
+  const files = await readdir(dir);
+  const video = files.find((f) => f === `${id}.mp4`);
+  if (!video) {
+    throw new Error(`download produced no ${id}.mp4 (got: ${files.join(", ")})`);
+  }
+  const sub = pickEnglishVtt(id, files);
+  return {
+    videoPath: join(dir, video),
+    subPath: sub ? join(dir, sub) : null,
+  };
 }
