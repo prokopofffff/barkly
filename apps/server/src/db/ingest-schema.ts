@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import type { Quiz, SubtitleToken as ZeroSubtitleToken } from "@barkly/zero";
 
 // Ingestion ("content factory") schema — the YouTube Shorts scraping pipeline.
 //
@@ -34,7 +35,8 @@ export type IngestStatus =
   | "transcribed" // captions normalized into the transcript table
   | "featured" // deterministic language features computed
   | "classified" // LLM safety/topic/level pass done
-  | "approved" // passed all gates — eligible for promotion to `video`
+  | "approved" // passed all gates — eligible for lesson generation
+  | "quizzed" // lesson (subtitle tokens + quiz) generated — ready to promote
   | "rejected" // failed a safety/quality gate
   | "promoted" // copied into the app `video` table
   | "failed"; // a stage errored; see `error`
@@ -186,6 +188,25 @@ export const videoDifficulty = pgTable("video_difficulty", {
     .defaultNow(),
 });
 
+// --- generated lesson (subtitle tokens + quiz) --------------------------------
+// The LLM-authored learning payload (bk-z5t.15) the app feed needs. Produced for
+// approved clips; consumed by the promote stage to build the synced `video` row.
+export const videoLesson = pgTable("video_lesson", {
+  videoId: text("video_id")
+    .primaryKey()
+    .references(() => ingestVideo.id),
+  captionRu: text("caption_ru").notNull().default(""), // Russian one-line caption
+  subtitle: jsonb("subtitle")
+    .$type<readonly ZeroSubtitleToken[]>()
+    .notNull()
+    .default([]),
+  quiz: jsonb("quiz").$type<Quiz>(), // one comprehension quiz (mc)
+  model: text("model").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // --- relations ----------------------------------------------------------------
 export const ingestChannelRelations = relations(ingestChannel, ({ many }) => ({
   videos: many(ingestVideo),
@@ -212,6 +233,10 @@ export const ingestVideoRelations = relations(ingestVideo, ({ one }) => ({
     fields: [ingestVideo.id],
     references: [videoDifficulty.videoId],
   }),
+  lesson: one(videoLesson, {
+    fields: [ingestVideo.id],
+    references: [videoLesson.videoId],
+  }),
 }));
 
 export type IngestChannel = typeof ingestChannel.$inferSelect;
@@ -220,3 +245,4 @@ export type Transcript = typeof transcript.$inferSelect;
 export type VideoFeatures = typeof videoFeatures.$inferSelect;
 export type VideoClassification = typeof videoClassification.$inferSelect;
 export type VideoDifficulty = typeof videoDifficulty.$inferSelect;
+export type VideoLesson = typeof videoLesson.$inferSelect;

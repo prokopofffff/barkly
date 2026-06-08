@@ -58,6 +58,9 @@ export const video = pgTable("video", {
   subtitle: jsonb("subtitle").$type<readonly SubtitleToken[]>().notNull(),
   quiz: jsonb("quiz").$type<Quiz>().notNull(),
   hlsUrl: text("hls_url").notNull(),
+  // Set for clips played via the YouTube IFrame embed (the ingestion pipeline's
+  // output); null for self-hosted/HLS clips. The mobile feed embeds by this id.
+  youtubeId: text("youtube_id"),
   langCode: text("lang_code").notNull(),
   level: text("level").notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
