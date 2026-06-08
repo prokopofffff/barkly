@@ -16,6 +16,11 @@ const envSchema = z.object({
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+
+  // Anthropic — the ingestion LLM classifier (bk-z5t.9). Optional at boot;
+  // src/ingest/classify.ts fails fast if used without a key.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5"),
 });
 
 export type Config = z.infer<typeof envSchema>;
