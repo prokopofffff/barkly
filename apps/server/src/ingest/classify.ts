@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "@/lib/config";
+import { anthropicClient } from "@/ingest/anthropic";
 
 // LLM classification (bk-z5t.9) — one Haiku call per clip over title + description
 // + tags + transcript, with a forced JSON schema. This is the nuanced safety /
@@ -101,16 +101,6 @@ CLASSIFICATION:
 - "learning_score": 0–100, overall usefulness of this clip for an English learner (clear, natural, useful everyday language scores high; unsafe/noisy/incoherent scores low).
 - "has_dialogue": true if two or more people converse (vs a single narrator/monologue).`;
 
-let cached: Anthropic | null = null;
-function client(): Anthropic {
-  if (cached) return cached;
-  if (!config.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
-  }
-  cached = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
-  return cached;
-}
-
 export type ClassifyInput = {
   readonly title: string;
   readonly description: string;
@@ -136,7 +126,7 @@ export type ClassifyOutput = {
 export async function classifyOne(
   input: ClassifyInput,
 ): Promise<ClassifyOutput> {
-  const message = await client().messages.create({
+  const message = await anthropicClient().messages.create({
     model: config.ANTHROPIC_MODEL,
     max_tokens: 512,
     system: [
