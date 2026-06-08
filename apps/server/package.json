@@ -21,6 +21,7 @@
     "ingest:features": "bun run src/ingest/features.cli.ts",
     "ingest:classify": "bun run src/ingest/classify.cli.ts",
     "ingest:difficulty": "bun run src/ingest/difficulty.cli.ts",
+    "ingest:run": "bun run src/ingest/pipeline.cli.ts",
     "zero:generate": "drizzle-zero generate -s src/db/schema.ts -o ../../packages/zero/src/schema.gen.ts --enable-legacy-queries --suppress-defaults-warning -f",
     "zero:deploy-perms": "zero-deploy-permissions -p src/zero/schema-config.ts",
     "prepare": "git config core.hooksPath .githooks || true"
