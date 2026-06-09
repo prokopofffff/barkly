@@ -25,6 +25,13 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_AUTH_TOKEN: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5"),
+  // LLM backend for the ingestion stages:
+  //   "api"        — Messages API (needs an API key + credits)
+  //   "claude_cli" — shell out to `claude -p` (uses a Claude subscription, no
+  //                  API credits). Local-test only: slow, no structured-output
+  //                  guarantee, carries Claude Code's system-prompt overhead.
+  LLM_PROVIDER: z.enum(["api", "claude_cli"]).default("api"),
+  CLAUDE_CLI_BIN: z.string().default("claude"),
 });
 
 export type Config = z.infer<typeof envSchema>;

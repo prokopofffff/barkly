@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { config } from "@/lib/config";
-import { anthropicClient } from "@/ingest/anthropic";
+import { completeStructuredJson } from "@/ingest/llm";
 
 // LLM classification (bk-z5t.9) — one Haiku call per clip over title + description
 // + tags + transcript, with a forced JSON schema. This is the nuanced safety /
@@ -126,29 +125,14 @@ export type ClassifyOutput = {
 export async function classifyOne(
   input: ClassifyInput,
 ): Promise<ClassifyOutput> {
-  const message = await anthropicClient().messages.create({
-    model: config.ANTHROPIC_MODEL,
-    max_tokens: 512,
-    system: [
-      {
-        type: "text",
-        text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [{ role: "user", content: buildUserContent(input) }],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: CLASSIFICATION_JSON_SCHEMA,
-      },
-    },
+  const { text, model } = await completeStructuredJson({
+    system: SYSTEM_PROMPT,
+    user: buildUserContent(input),
+    schema: CLASSIFICATION_JSON_SCHEMA,
+    maxTokens: 512,
   });
-
-  const text = message.content.find((b) => b.type === "text")?.text;
-  if (!text) throw new Error("classifier returned no text block");
   const classification = classificationSchema.parse(JSON.parse(text));
-  return { classification, model: message.model };
+  return { classification, model };
 }
 
 // --- safety gate -------------------------------------------------------------

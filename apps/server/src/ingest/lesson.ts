@@ -1,8 +1,7 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Quiz, SubtitleToken } from "@barkly/zero";
-import { anthropicClient } from "@/ingest/anthropic";
-import { config } from "@/lib/config";
+import { completeStructuredJson } from "@/ingest/llm";
 
 // Lesson generation (bk-z5t.15, variant B): turn an approved clip's transcript
 // into the app's learning payload — a Russian caption, a tokenized English
@@ -124,30 +123,18 @@ export function buildLessonUserContent(input: LessonInput): string {
 }
 
 export async function generateLesson(input: LessonInput): Promise<Lesson> {
-  const message = await anthropicClient().messages.create({
-    model: config.ANTHROPIC_MODEL,
-    max_tokens: 1024,
-    system: [
-      {
-        type: "text",
-        text: LESSON_SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [{ role: "user", content: buildLessonUserContent(input) }],
-    output_config: {
-      format: { type: "json_schema", schema: LESSON_JSON_SCHEMA },
-    },
+  const { text, model } = await completeStructuredJson({
+    system: LESSON_SYSTEM_PROMPT,
+    user: buildLessonUserContent(input),
+    schema: LESSON_JSON_SCHEMA,
+    maxTokens: 1024,
   });
-
-  const text = message.content.find((b) => b.type === "text")?.text;
-  if (!text) throw new Error("lesson generator returned no text block");
   const raw = lessonSchema.parse(JSON.parse(text));
   return {
     captionRu: raw.caption_ru,
     subtitle: toSubtitleTokens(raw.subtitle),
     quiz: toQuiz(raw.quiz),
-    model: message.model,
+    model,
   };
 }
 
