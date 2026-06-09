@@ -12,8 +12,7 @@ orchestration, and AI content generation.
 - **DB:** Postgres via Drizzle (single schema source; Zero schema generated with
   `drizzle-zero`)
 - **Jobs:** pg-boss · **Auth:** anonymous-first JWT (`jose`)
-- **Cloud:** Yandex Cloud (Managed PostgreSQL, Object Storage, Cloud CDN, Cloud
-  Video, SpeechKit, YandexGPT)
+- **Cloud:** managed Postgres + S3-compatible object storage + CDN (provider TBD)
 
 See [`docs/DEV_STANDARDS.md`](docs/DEV_STANDARDS.md) for conventions.
 
