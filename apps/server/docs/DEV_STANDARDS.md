@@ -57,7 +57,7 @@ src/
   db/             Drizzle schema, queries, migrations
   domain/<area>/  feature logic by domain (auth, feed, lessons, content, media)
   jobs/           pg-boss workers (transcode-orchestration, stt, question-gen)
-  lib/            cross-cutting helpers (yandex clients, jwt, config)
+  lib/            cross-cutting helpers (cloud clients, jwt, config)
 ```
 
 - Routes and job handlers stay thin: parse + authorize + delegate. Logic lives in
@@ -82,7 +82,7 @@ src/
   → update the mobile mirror. Never edit one side alone.
 - **Migrations via `drizzle-kit`.** Every schema change ships a migration; never
   mutate a deployed schema by hand.
-- `wal_level=logical` is required for Zero. On Yandex Managed PostgreSQL set
+- `wal_level=logical` is required for Zero. On a managed Postgres set
   **`max_slot_wal_keep_size` to a bounded value** — an inactive `zero-cache`
   replication slot with the default `-1` can fill the disk and lock the cluster.
 
@@ -107,9 +107,9 @@ src/
 Some work doesn't fit the sync model and lives in `routes/` + `jobs/`:
 
 - **Auth token minting** (§9).
-- **Video upload + transcode orchestration** → Yandex **Cloud Video** (managed
-  HLS). We store only the resulting `hlsUrl` pointer; **video is never synced
-  through Zero**.
+- **Video upload + transcode orchestration** → a managed HLS/transcode service
+  (provider TBD). We store only the resulting `hlsUrl` pointer; **video is never
+  synced through Zero**.
 - **AI content pipeline** (§8).
 - **Push notifications.**
 
@@ -119,14 +119,14 @@ Lessons are **hand-authored**, but subtitles and questions are **AI-generated**,
 then human-reviewed. The pipeline runs as `pg-boss` jobs:
 
 ```
-upload → Cloud Video (HLS) → [job] SpeechKit STT (subtitles)
-       → [job] YandexGPT (translate + generate questions)
+upload → transcode (HLS) → [job] STT (subtitles)
+       → [job] LLM (translate + generate questions)
        → human review/edit → publish
 ```
 
-- **STT: Yandex SpeechKit.** **AI generation: YandexGPT.** Both are native to our
-  cloud — no foreign-API access friction, and stronger on Russian. Don't add
-  Claude/OpenAI without an explicit decision recorded here.
+- **STT** (subtitles) and the **LLM** (translate + question generation) run
+  through a provider chosen later — record the decision here before wiring one
+  in. Don't add Claude/OpenAI/etc. without an explicit decision recorded here.
 - **AI output is always `draft` until a human approves it.** Content has a
   `draft → reviewed → published` status; only `published` reaches learners.
   Never auto-publish generated questions.
@@ -153,11 +153,12 @@ upload → Cloud Video (HLS) → [job] SpeechKit STT (subtitles)
   user's JWT). Never log secrets, tokens, or full AI prompts containing user data.
 - Provide a `.env.example` with every key documented and dummy values.
 
-## 11. Hosting — Yandex Cloud, self-managed services
+## 11. Hosting — self-managed services (cloud provider TBD)
 
-- **Managed PostgreSQL** (logical replication enabled), **Object Storage**
-  (S3-compatible, for media + the `zero-cache` replication backup), **Cloud CDN**
-  (video delivery), **Cloud Video** (transcode), **SpeechKit**, **YandexGPT**.
+- **Managed PostgreSQL** (logical replication enabled), **S3-compatible object
+  storage** (media + the `zero-cache` replication backup), a **CDN** (video
+  delivery), a **transcode/HLS** service, **STT**, and an **LLM** — all behind a
+  provider chosen later.
 - This service, the admin web app, and **`zero-cache`** run on Compute /
   Serverless Containers. `zero-cache` is **stateful** (keeps a SQLite replica on
   disk) — it needs a persistent volume and is the trickiest piece to deploy.
