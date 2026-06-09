@@ -1,4 +1,4 @@
-import { config } from "@/lib/config";
+import { hasAnthropicCreds } from "@/ingest/anthropic";
 import { runClassify } from "@/ingest/classify";
 import { runDifficulty } from "@/ingest/difficulty";
 import { discoverAll } from "@/ingest/discover";
@@ -45,7 +45,7 @@ export async function runPipeline(
     log(`discover: +${inserted} new candidates (${failed} channel(s) failed)`);
   }
 
-  const hasKey = Boolean(config.ANTHROPIC_API_KEY);
+  const hasKey = hasAnthropicCreds();
   const stages: Stage[] = [
     {
       name: "prefilter",
@@ -82,7 +82,7 @@ export async function runPipeline(
           .length,
     });
   } else {
-    log("ANTHROPIC_API_KEY not set — skipping classify + difficulty + lesson");
+    log("no Anthropic credential — skipping classify + difficulty + lesson");
   }
   // Promote needs no key; it runs last so quizzed clips land in `video`.
   stages.push({

@@ -17,9 +17,13 @@ const envSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
 
-  // Anthropic — the ingestion LLM classifier (bk-z5t.9). Optional at boot;
-  // src/ingest/classify.ts fails fast if used without a key.
+  // Anthropic — the ingestion LLM stages (classify, lesson). Optional at boot;
+  // src/ingest/anthropic.ts fails fast if used without either credential.
+  // Provide ONE of: ANTHROPIC_API_KEY (console.anthropic.com, x-api-key) or
+  // ANTHROPIC_AUTH_TOKEN (OAuth bearer; note: subscription tokens are scoped to
+  // Claude Code and may be rejected for direct API use).
   ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_AUTH_TOKEN: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5"),
 });
 
