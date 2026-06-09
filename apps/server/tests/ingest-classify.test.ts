@@ -21,6 +21,9 @@ const safe: Classification = {
   speech_clarity: 8,
   learning_score: 82,
   has_dialogue: false,
+  idiom_density: 2,
+  syntax_complexity: 3,
+  abstractness: 2,
 };
 
 describe("rejectReason", () => {

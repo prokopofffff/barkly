@@ -6,7 +6,9 @@ const easy: DifficultyInput = {
   rareWordRatio: 0.03, // mostly common words
   avgSentenceLen: 6, // short sentences
   speechClarity: 10, // crystal clear
-  englishLevel: "A1",
+  idiomDensity: 1,
+  syntaxComplexity: 1,
+  abstractness: 1,
 };
 
 const hard: DifficultyInput = {
@@ -14,7 +16,9 @@ const hard: DifficultyInput = {
   rareWordRatio: 0.3, // lots of rare words
   avgSentenceLen: 24, // long sentences
   speechClarity: 2, // muddy
-  englishLevel: "C2",
+  idiomDensity: 5,
+  syntaxComplexity: 5,
+  abstractness: 5,
 };
 
 describe("computeDifficultyPrior", () => {
@@ -29,37 +33,40 @@ describe("computeDifficultyPrior", () => {
   });
 
   test("faster speech raises difficulty", () => {
-    const slow = computeDifficultyPrior({ ...easy, wpm: 110 });
-    const fast = computeDifficultyPrior({ ...easy, wpm: 220 });
-    expect(fast).toBeGreaterThan(slow);
+    expect(computeDifficultyPrior({ ...easy, wpm: 220 })).toBeGreaterThan(
+      computeDifficultyPrior({ ...easy, wpm: 110 }),
+    );
   });
 
   test("clearer speech lowers difficulty", () => {
-    const muddy = computeDifficultyPrior({ ...hard, speechClarity: 1 });
-    const clear = computeDifficultyPrior({ ...hard, speechClarity: 10 });
-    expect(clear).toBeLessThan(muddy);
+    expect(computeDifficultyPrior({ ...hard, speechClarity: 10 })).toBeLessThan(
+      computeDifficultyPrior({ ...hard, speechClarity: 1 }),
+    );
   });
 
-  test("higher CEFR level raises difficulty", () => {
-    const a2 = computeDifficultyPrior({ ...easy, englishLevel: "A2" });
-    const c1 = computeDifficultyPrior({ ...easy, englishLevel: "C1" });
-    expect(c1).toBeGreaterThan(a2);
-  });
-
-  test("unknown level falls back to mid difficulty", () => {
-    const unknown = computeDifficultyPrior({ ...easy, englishLevel: "" });
-    const a1 = computeDifficultyPrior({ ...easy, englishLevel: "A1" });
-    expect(unknown).toBeGreaterThan(a1); // mid (0.5) > A1 (0.0)
+  test("each rubric rating monotonically raises difficulty", () => {
+    expect(computeDifficultyPrior({ ...easy, idiomDensity: 5 })).toBeGreaterThan(
+      computeDifficultyPrior(easy),
+    );
+    expect(computeDifficultyPrior({ ...easy, syntaxComplexity: 5 })).toBeGreaterThan(
+      computeDifficultyPrior(easy),
+    );
+    expect(computeDifficultyPrior({ ...easy, abstractness: 5 })).toBeGreaterThan(
+      computeDifficultyPrior(easy),
+    );
   });
 
   test("clamps out-of-range inputs", () => {
-    const beyond = computeDifficultyPrior({
-      wpm: 999,
-      rareWordRatio: 5,
-      avgSentenceLen: 999,
-      speechClarity: 0,
-      englishLevel: "C2",
-    });
-    expect(beyond).toBe(1000);
+    expect(
+      computeDifficultyPrior({
+        wpm: 999,
+        rareWordRatio: 5,
+        avgSentenceLen: 999,
+        speechClarity: 0,
+        idiomDensity: 5,
+        syntaxComplexity: 5,
+        abstractness: 5,
+      }),
+    ).toBe(1000);
   });
 });

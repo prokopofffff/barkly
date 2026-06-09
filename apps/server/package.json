@@ -21,6 +21,7 @@
     "ingest:features": "bun run src/ingest/features.cli.ts",
     "ingest:classify": "bun run src/ingest/classify.cli.ts",
     "ingest:difficulty": "bun run src/ingest/difficulty.cli.ts",
+    "ingest:difficulty-check": "bun run src/ingest/difficulty-check.cli.ts",
     "ingest:lesson": "bun run src/ingest/lesson.cli.ts",
     "ingest:promote": "bun run src/ingest/promote.cli.ts",
     "ingest:run": "bun run src/ingest/pipeline.cli.ts",

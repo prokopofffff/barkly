@@ -6,31 +6,26 @@ import { eq } from "drizzle-orm";
 // adaptive system (bk-z5t.13) can update it in the same space from real user
 // signal (correct rate, rewatch counts). At ingestion we only have the prior.
 
-// CEFR level -> [0,1] difficulty contribution. Unknown/blank -> mid (0.5).
-const LEVEL_DIFFICULTY: Record<string, number> = {
-  A1: 0.0,
-  A2: 0.2,
-  B1: 0.4,
-  B2: 0.6,
-  C1: 0.8,
-  C2: 1.0,
-};
-
-// Normalization bounds per signal (typical range for English Shorts).
+// Normalization bounds per deterministic signal (typical range for Shorts).
 export const BOUNDS = {
   wpm: { min: 100, max: 220 }, // slow vs fast speech
   rareWordRatio: { min: 0, max: 0.35 }, // share of words outside the top 5000
   avgSentenceLen: { min: 5, max: 25 }, // words per sentence
 } as const;
 
-// Weights sum to 1. The LLM's holistic level is the single strongest signal;
-// the rest are deterministic.
+// Weights sum to 1. The hybrid: ~40% computed features (fully reproducible),
+// ~60% anchored 1-5 LLM rubric ratings (bk-z5t.16) — discrete + code-side
+// weighting keeps the prior stable across runs.
 export const WEIGHTS = {
-  level: 0.3,
-  wpm: 0.2,
-  rareWordRatio: 0.2,
-  avgSentenceLen: 0.15,
-  clarity: 0.15, // inverse: clearer speech -> easier
+  // deterministic
+  wpm: 0.15,
+  rareWordRatio: 0.15,
+  avgSentenceLen: 0.1,
+  // LLM rubric (1-5)
+  idiomDensity: 0.2,
+  syntaxComplexity: 0.15,
+  abstractness: 0.15,
+  clarity: 0.1, // inverse: clearer speech -> easier
 } as const;
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -39,17 +34,21 @@ function norm(value: number, min: number, max: number): number {
   return clamp01((value - min) / (max - min));
 }
 
+// 1-5 anchored rating -> [0,1].
+const rating01 = (r: number) => clamp01((r - 1) / 4);
+
 export type DifficultyInput = {
   readonly wpm: number;
   readonly rareWordRatio: number;
   readonly avgSentenceLen: number;
   readonly speechClarity: number; // 0-10 (higher = clearer)
-  readonly englishLevel: string; // A1..C2 (or blank)
+  readonly idiomDensity: number; // 1-5
+  readonly syntaxComplexity: number; // 1-5
+  readonly abstractness: number; // 1-5
 };
 
 /** Continuous difficulty prior in [0, 1000]. Higher = harder for a learner. */
 export function computeDifficultyPrior(input: DifficultyInput): number {
-  const level = LEVEL_DIFFICULTY[input.englishLevel] ?? 0.5;
   const wpm = norm(input.wpm, BOUNDS.wpm.min, BOUNDS.wpm.max);
   const rare = norm(
     input.rareWordRatio,
@@ -65,10 +64,12 @@ export function computeDifficultyPrior(input: DifficultyInput): number {
   const clarity = clamp01((10 - input.speechClarity) / 10);
 
   const score =
-    WEIGHTS.level * level +
     WEIGHTS.wpm * wpm +
     WEIGHTS.rareWordRatio * rare +
     WEIGHTS.avgSentenceLen * sentence +
+    WEIGHTS.idiomDensity * rating01(input.idiomDensity) +
+    WEIGHTS.syntaxComplexity * rating01(input.syntaxComplexity) +
+    WEIGHTS.abstractness * rating01(input.abstractness) +
     WEIGHTS.clarity * clarity;
 
   return Math.round(clamp01(score) * 1000);
@@ -98,7 +99,9 @@ export async function runDifficulty(opts: {
       rareWordRatio: videoFeatures.rareWordRatio,
       avgSentenceLen: videoFeatures.avgSentenceLen,
       speechClarity: videoClassification.speechClarity,
-      englishLevel: videoClassification.englishLevel,
+      idiomDensity: videoClassification.idiomDensity,
+      syntaxComplexity: videoClassification.syntaxComplexity,
+      abstractness: videoClassification.abstractness,
     })
     .from(ingestVideo)
     .innerJoin(videoFeatures, eq(videoFeatures.videoId, ingestVideo.id))
@@ -117,7 +120,9 @@ export async function runDifficulty(opts: {
         rareWordRatio: row.rareWordRatio,
         avgSentenceLen: row.avgSentenceLen,
         speechClarity: row.speechClarity,
-        englishLevel: row.englishLevel ?? "",
+        idiomDensity: row.idiomDensity,
+        syntaxComplexity: row.syntaxComplexity,
+        abstractness: row.abstractness,
       });
 
       if (opts.persist) {

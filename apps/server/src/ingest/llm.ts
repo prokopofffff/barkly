@@ -39,6 +39,8 @@ async function viaApi({ system, user, schema, maxTokens }: StructuredArgs) {
   const message = await anthropicClient().messages.create({
     model: config.ANTHROPIC_MODEL,
     max_tokens: maxTokens,
+    // Minimize run-to-run variance (the CLI provider can't set this).
+    temperature: 0,
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: user }],
     output_config: { format: { type: "json_schema", schema } },

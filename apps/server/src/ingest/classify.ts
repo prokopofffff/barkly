@@ -44,6 +44,10 @@ export const classificationSchema = z.object({
   speech_clarity: z.number().int().min(0).max(10),
   learning_score: z.number().int().min(0).max(100),
   has_dialogue: z.boolean(),
+  // Anchored 1-5 difficulty sub-ratings (bk-z5t.16).
+  idiom_density: z.number().int().min(1).max(5),
+  syntax_complexity: z.number().int().min(1).max(5),
+  abstractness: z.number().int().min(1).max(5),
 });
 
 export type Classification = z.infer<typeof classificationSchema>;
@@ -67,6 +71,9 @@ export const CLASSIFICATION_JSON_SCHEMA = {
     speech_clarity: { type: "integer" },
     learning_score: { type: "integer" },
     has_dialogue: { type: "boolean" },
+    idiom_density: { type: "integer" },
+    syntax_complexity: { type: "integer" },
+    abstractness: { type: "integer" },
   },
   required: [
     "safe",
@@ -81,6 +88,9 @@ export const CLASSIFICATION_JSON_SCHEMA = {
     "speech_clarity",
     "learning_score",
     "has_dialogue",
+    "idiom_density",
+    "syntax_complexity",
+    "abstractness",
   ],
 } as const;
 
@@ -98,7 +108,12 @@ CLASSIFICATION:
 - "english_level": CEFR difficulty of the English used (A1 easiest … C2 hardest) — judge vocabulary, idioms, and speed.
 - "speech_clarity": 0–10, how clear and well-articulated the speech is for a learner (accent, pace, audio).
 - "learning_score": 0–100, overall usefulness of this clip for an English learner (clear, natural, useful everyday language scores high; unsafe/noisy/incoherent scores low).
-- "has_dialogue": true if two or more people converse (vs a single narrator/monologue).`;
+- "has_dialogue": true if two or more people converse (vs a single narrator/monologue).
+
+DIFFICULTY — rate each 1–5 using these exact anchors (be strict and consistent; judge ONLY from the transcript):
+- "idiom_density" (phrasal verbs, idioms, slang): 1 = fully literal, none; 2 = one common phrasal verb; 3 = several phrasal verbs or a common idiom; 4 = frequent idioms/phrasal verbs/slang; 5 = dense idiomatic/slang, hard to read literally.
+- "syntax_complexity": 1 = short simple sentences; 2 = mostly simple, some compound; 3 = mix of compound and complex; 4 = long sentences with subordinate clauses; 5 = very long sentences with multiple embedded clauses.
+- "abstractness": 1 = concrete everyday objects/actions; 2 = mostly concrete; 3 = mix of concrete and abstract; 4 = largely abstract/conceptual; 5 = highly abstract, technical, or philosophical.`;
 
 export type ClassifyInput = {
   readonly title: string;
@@ -217,6 +232,9 @@ export async function runClassify(opts: {
             speechClarity: c.speech_clarity,
             learningScore: c.learning_score,
             englishLevel: c.english_level,
+            idiomDensity: c.idiom_density,
+            syntaxComplexity: c.syntax_complexity,
+            abstractness: c.abstractness,
             model,
             modelVersion: model,
             raw: c,
@@ -235,6 +253,9 @@ export async function runClassify(opts: {
               speechClarity: c.speech_clarity,
               learningScore: c.learning_score,
               englishLevel: c.english_level,
+              idiomDensity: c.idiom_density,
+              syntaxComplexity: c.syntax_complexity,
+              abstractness: c.abstractness,
               model,
               modelVersion: model,
               raw: c,
