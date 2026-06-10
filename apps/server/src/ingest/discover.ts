@@ -1,3 +1,4 @@
+import { sleep } from "@/ingest/util";
 import { ingestChannel, ingestVideo } from "@/db/ingest-schema";
 import { channelSeed, type ChannelSeed } from "@/ingest/channels.seed";
 import { fetchChannelShorts, type ChannelShorts } from "@/ingest/ytdlp";
@@ -22,7 +23,6 @@ export type DiscoverOptions = {
   seeds?: readonly ChannelSeed[];
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function discoverChannel(
   seed: ChannelSeed,

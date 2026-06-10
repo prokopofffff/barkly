@@ -1,13 +1,15 @@
 import type { CustomMutatorDefs, ServerTransaction } from "@rocicorp/zero/server";
 import type { PostgresJsTransaction } from "@rocicorp/zero/server/adapters/postgresjs";
-import { createMutators, type Quiz, type Schema } from "@barkly/zero";
-import { applyEarn, gradeQuiz } from "@/domain/lessons/economy";
 import {
   applyEloResult,
   applyRewatchPenalty,
+  createMutators,
   DEFAULT_ELO,
+  type Quiz,
+  type Schema,
   seedElo,
-} from "@/domain/lessons/elo";
+} from "@barkly/zero";
+import { applyEarn, gradeQuiz } from "@/domain/lessons/economy";
 
 // Authoritative server mutators (BACKEND_PLAN §5). The push endpoint re-runs the
 // SAME-named mutators the client applies optimistically, but here we:

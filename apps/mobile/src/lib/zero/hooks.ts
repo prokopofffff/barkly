@@ -1,13 +1,11 @@
+import { useMemo } from 'react';
 import { useQuery } from '@rocicorp/zero/react';
-import type { Video } from '@barkly/zero';
+import { DEFAULT_ELO, PROVISIONAL_GAMES, type Video } from '@barkly/zero';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { SAMPLE_VIDEOS, type FeedVideoItem } from '@/lib/feed/sample-videos';
 import { useCurrentUserQuery, useFeedQuery } from '@/lib/zero/queries';
 
-// Keep in sync with apps/server/src/domain/lessons/elo.ts.
-const DEFAULT_ELO = 500;
-const PROVISIONAL_GAMES = 5;
 const FEED_SIZE = 50;
 const MIN_IN_WINDOW = 15;
 
@@ -66,8 +64,11 @@ export function useFeedVideos(): FeedVideoItem[] {
   const { user } = useAuth();
   const [rows] = useQuery(useFeedQuery('en'));
   const [me] = useQuery(useCurrentUserQuery(user?.userID ?? ''));
-  if (rows.length === 0) return SAMPLE_VIDEOS;
   const elo = me?.elo ?? DEFAULT_ELO;
   const games = me?.eloGames ?? 0;
-  return matchmake(rows, elo, games).map(mapVideoRow);
+  // Recompute only when the inputs change — FeedScreen re-renders frequently.
+  return useMemo(
+    () => (rows.length === 0 ? SAMPLE_VIDEOS : matchmake(rows, elo, games).map(mapVideoRow)),
+    [rows, elo, games],
+  );
 }

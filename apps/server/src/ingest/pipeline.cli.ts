@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runPipeline } from "@/ingest/pipeline";
 
 // CLI for the whole ingestion pipeline (bk-z5t.11). Runs every stage in order,
@@ -9,10 +10,6 @@ import { runPipeline } from "@/ingest/pipeline";
 //   bun run ingest:run -- --discover --discover-limit 50
 //   bun run ingest:run -- --batch 100 --delay 800 --rounds 1000
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const opts = {

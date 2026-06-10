@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runDownload } from "@/ingest/download";
 
 // CLI for download + transcode + upload (bk-z5t.6). Operates on 'prefiltered'
@@ -10,10 +11,6 @@ import { runDownload } from "@/ingest/download";
 //   bun run ingest:download -- --keep-raw    # also upload the original mp4
 //   bun run ingest:download -- --delay 2000
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 const mib = (b: number) => `${(b / 1024 / 1024).toFixed(1)}MiB`;
 

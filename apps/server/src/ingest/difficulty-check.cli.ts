@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { classifyOne } from "@/ingest/classify";
 import { computeDifficultyPrior } from "@/ingest/difficulty";
 import { computeFeatures } from "@/ingest/features";
@@ -16,10 +17,6 @@ const SAMPLE =
   "Just cut back on the small stuff that adds up over time, and put that cash into an account " +
   "you can't easily touch. Before you know it, you've pulled together a real cushion.";
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const runs = Number(arg("--runs") ?? 5);

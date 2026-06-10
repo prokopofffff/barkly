@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runPromote } from "@/ingest/promote";
 
 // CLI for promote (bk-z5t.12). Copies 'quizzed' clips into the synced `video`
@@ -8,10 +9,6 @@ import { runPromote } from "@/ingest/promote";
 //   bun run ingest:promote -- --limit 100
 //   bun run ingest:promote -- --dry
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 500);

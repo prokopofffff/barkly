@@ -1,4 +1,4 @@
-import type { Quiz } from "@barkly/zero";
+import type { Quiz } from "./types";
 
 // Adaptive difficulty via a per-user ELO (bk-z5t.18). Users and videos share one
 // 0-1000+ scale: video.difficulty is the ingestion prior; user.elo starts from

@@ -9,7 +9,7 @@ import {
   PROVISIONAL_GAMES,
   REWATCH_PENALTY,
   seedElo,
-} from "@/domain/lessons/elo";
+} from "@barkly/zero";
 
 describe("seedElo", () => {
   test("maps onboarding labels to starting ELO", () => {

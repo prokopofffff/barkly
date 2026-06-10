@@ -1,3 +1,4 @@
+import { sleep } from "@/ingest/util";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,7 +25,6 @@ export type TranscribeOptions = {
   persist: boolean;
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function processOne(
   row: { id: string; captionSource: CaptionSource | null },
@@ -47,25 +47,18 @@ async function processOne(
     if (persist) {
       const { db } = await import("@/db");
       const { ingestVideo, transcript } = await import("@/db/ingest-schema");
+      const values = {
+        videoId: row.id,
+        lang: "en",
+        source,
+        text: parsed.text,
+        segments: parsed.segments,
+        quality: parsed.quality,
+      };
       await db
         .insert(transcript)
-        .values({
-          videoId: row.id,
-          lang: "en",
-          source,
-          text: parsed.text,
-          segments: parsed.segments,
-          quality: parsed.quality,
-        })
-        .onConflictDoUpdate({
-          target: transcript.videoId,
-          set: {
-            source,
-            text: parsed.text,
-            segments: parsed.segments,
-            quality: parsed.quality,
-          },
-        });
+        .values(values)
+        .onConflictDoUpdate({ target: transcript.videoId, set: values });
       await db
         .update(ingestVideo)
         .set({ status: "transcribed", error: null, updatedAt: new Date() })

@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runClassify } from "@/ingest/classify";
 
 // CLI for LLM classification (bk-z5t.9). Operates on 'featured' rows: one Haiku
@@ -9,10 +10,6 @@ import { runClassify } from "@/ingest/classify";
 //   bun run ingest:classify -- --dry
 //   bun run ingest:classify -- --delay 500
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 200);

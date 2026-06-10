@@ -1,3 +1,4 @@
+import { sleep } from "@/ingest/util";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Quiz, SubtitleToken } from "@barkly/zero";
@@ -172,7 +173,6 @@ export async function runLesson(opts: {
     .where(eq(ingestVideo.status, "approved"))
     .limit(opts.limit);
 
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const results: LessonResult[] = [];
 
   for (const row of rows) {
@@ -184,24 +184,17 @@ export async function runLesson(opts: {
       });
 
       if (opts.persist) {
+        const values = {
+          videoId: row.id,
+          captionRu: lesson.captionRu,
+          subtitle: lesson.subtitle,
+          quiz: lesson.quiz,
+          model: lesson.model,
+        };
         await db
           .insert(videoLesson)
-          .values({
-            videoId: row.id,
-            captionRu: lesson.captionRu,
-            subtitle: lesson.subtitle,
-            quiz: lesson.quiz,
-            model: lesson.model,
-          })
-          .onConflictDoUpdate({
-            target: videoLesson.videoId,
-            set: {
-              captionRu: lesson.captionRu,
-              subtitle: lesson.subtitle,
-              quiz: lesson.quiz,
-              model: lesson.model,
-            },
-          });
+          .values(values)
+          .onConflictDoUpdate({ target: videoLesson.videoId, set: values });
         await db
           .update(ingestVideo)
           .set({ status: "quizzed", error: null, updatedAt: new Date() })

@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runDifficulty } from "@/ingest/difficulty";
 
 // CLI for the difficulty-prior stage (bk-z5t.10). Operates on 'classified' rows,
@@ -8,10 +9,6 @@ import { runDifficulty } from "@/ingest/difficulty";
 //   bun run ingest:difficulty -- --limit 100
 //   bun run ingest:difficulty -- --dry
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 500);

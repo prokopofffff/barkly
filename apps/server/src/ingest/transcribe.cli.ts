@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runTranscribe } from "@/ingest/transcribe";
 
 // CLI for the transcript stage (bk-z5t.7). Operates on 'prefiltered' rows:
@@ -9,10 +10,6 @@ import { runTranscribe } from "@/ingest/transcribe";
 //   bun run ingest:transcribe -- --dry         # fetch+parse, print, no DB
 //   bun run ingest:transcribe -- --delay 1000
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 200);

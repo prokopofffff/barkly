@@ -1,3 +1,4 @@
+import { sleep } from "@/ingest/util";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { completeStructuredJson } from "@/ingest/llm";
@@ -207,7 +208,6 @@ export async function runClassify(opts: {
     .where(eq(ingestVideo.status, "featured"))
     .limit(opts.limit);
 
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const results: ClassifyResult[] = [];
 
   for (const row of rows) {
@@ -221,51 +221,33 @@ export async function runClassify(opts: {
       const reject = rejectReason(c);
 
       if (opts.persist) {
+        const values = {
+          videoId: row.id,
+          safe: c.safe,
+          topic: c.topic,
+          containsPolitics: c.contains_politics,
+          containsWar: c.contains_war,
+          containsSexual: c.contains_sexual,
+          containsHate: c.contains_hate,
+          containsProfanity: c.contains_profanity,
+          profanityCount: c.profanity_count,
+          speechClarity: c.speech_clarity,
+          learningScore: c.learning_score,
+          englishLevel: c.english_level,
+          idiomDensity: c.idiom_density,
+          slangDensity: c.slang_density,
+          syntaxComplexity: c.syntax_complexity,
+          abstractness: c.abstractness,
+          model,
+          modelVersion: model,
+          raw: c,
+        };
         await db
           .insert(videoClassification)
-          .values({
-            videoId: row.id,
-            safe: c.safe,
-            topic: c.topic,
-            containsPolitics: c.contains_politics,
-            containsWar: c.contains_war,
-            containsSexual: c.contains_sexual,
-            containsHate: c.contains_hate,
-            containsProfanity: c.contains_profanity,
-            profanityCount: c.profanity_count,
-            speechClarity: c.speech_clarity,
-            learningScore: c.learning_score,
-            englishLevel: c.english_level,
-            idiomDensity: c.idiom_density,
-            slangDensity: c.slang_density,
-            syntaxComplexity: c.syntax_complexity,
-            abstractness: c.abstractness,
-            model,
-            modelVersion: model,
-            raw: c,
-          })
+          .values(values)
           .onConflictDoUpdate({
             target: videoClassification.videoId,
-            set: {
-              safe: c.safe,
-              topic: c.topic,
-              containsPolitics: c.contains_politics,
-              containsWar: c.contains_war,
-              containsSexual: c.contains_sexual,
-              containsHate: c.contains_hate,
-              containsProfanity: c.contains_profanity,
-              profanityCount: c.profanity_count,
-              speechClarity: c.speech_clarity,
-              learningScore: c.learning_score,
-              englishLevel: c.english_level,
-              idiomDensity: c.idiom_density,
-              slangDensity: c.slang_density,
-              syntaxComplexity: c.syntax_complexity,
-              abstractness: c.abstractness,
-              model,
-              modelVersion: model,
-              raw: c,
-            },
+            set: values,
           });
         await db
           .update(ingestVideo)

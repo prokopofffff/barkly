@@ -1,3 +1,4 @@
+import { sleep } from "@/ingest/util";
 import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +31,6 @@ export type DownloadOptions = {
   keepRaw: boolean; // also upload the original as source-of-truth
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function fileSize(path: string): Promise<number> {
   return (await stat(path)).size;

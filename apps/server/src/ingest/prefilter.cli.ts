@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runPrefilter } from "@/ingest/prefilter";
 
 // CLI for the cheap pre-filter (bk-z5t.5). Operates on rows in 'discovered',
@@ -10,10 +11,6 @@ import { runPrefilter } from "@/ingest/prefilter";
 //   bun run ingest:prefilter -- --dry         # evaluate + print, no writes
 //   bun run ingest:prefilter -- --delay 1000  # ms between videos (default 800)
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 200);

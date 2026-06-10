@@ -1,3 +1,4 @@
+import { sleep } from "@/ingest/util";
 import { eq } from "drizzle-orm";
 import type { CaptionSource } from "@/db/ingest-schema";
 import { fetchVideoMeta, type VideoMeta } from "@/ingest/ytdlp";
@@ -129,7 +130,6 @@ export type PrefilterOptions = {
   persist: boolean;
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function statsOf(meta: VideoMeta) {
   const s: { views?: number; likes?: number; comments?: number } = {};

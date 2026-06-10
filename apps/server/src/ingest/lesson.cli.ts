@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runLesson } from "@/ingest/lesson";
 
 // CLI for lesson generation (bk-z5t.15). Operates on 'approved' rows: one Haiku
@@ -8,10 +9,6 @@ import { runLesson } from "@/ingest/lesson";
 //   bun run ingest:lesson -- --limit 20
 //   bun run ingest:lesson -- --dry
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 200);

@@ -1,3 +1,4 @@
+import { arg, has } from "@/ingest/util";
 import { channelSeed, type ChannelSeed } from "@/ingest/channels.seed";
 import { discoverAll, type DiscoverResult } from "@/ingest/discover";
 
@@ -9,13 +10,6 @@ import { discoverAll, type DiscoverResult } from "@/ingest/discover";
 //   bun run ingest:discover -- --handle @TED  # a single channel
 //   bun run ingest:discover -- --delay 2000 # ms between channels (default 1500)
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
-function has(flag: string): boolean {
-  return process.argv.includes(flag);
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 50);

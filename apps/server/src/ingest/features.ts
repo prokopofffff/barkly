@@ -108,30 +108,20 @@ export async function runFeatures(opts: {
     try {
       const f = computeFeatures(row.text, row.durationS);
       if (opts.persist) {
+        const values = {
+          videoId: row.id,
+          wpm: f.wpm,
+          wordCount: f.wordCount,
+          uniqueWords: f.uniqueWords,
+          ttr: f.ttr,
+          rareWordRatio: f.rareWordRatio,
+          freqDistribution: f.freqDistribution,
+          avgSentenceLen: f.avgSentenceLen,
+        };
         await db
           .insert(videoFeatures)
-          .values({
-            videoId: row.id,
-            wpm: f.wpm,
-            wordCount: f.wordCount,
-            uniqueWords: f.uniqueWords,
-            ttr: f.ttr,
-            rareWordRatio: f.rareWordRatio,
-            freqDistribution: f.freqDistribution,
-            avgSentenceLen: f.avgSentenceLen,
-          })
-          .onConflictDoUpdate({
-            target: videoFeatures.videoId,
-            set: {
-              wpm: f.wpm,
-              wordCount: f.wordCount,
-              uniqueWords: f.uniqueWords,
-              ttr: f.ttr,
-              rareWordRatio: f.rareWordRatio,
-              freqDistribution: f.freqDistribution,
-              avgSentenceLen: f.avgSentenceLen,
-            },
-          });
+          .values(values)
+          .onConflictDoUpdate({ target: videoFeatures.videoId, set: values });
         await db
           .update(ingestVideo)
           .set({ status: "featured", error: null, updatedAt: new Date() })

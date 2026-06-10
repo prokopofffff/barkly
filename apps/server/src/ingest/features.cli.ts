@@ -1,3 +1,4 @@
+import { arg } from "@/ingest/util";
 import { runFeatures } from "@/ingest/features";
 
 // CLI for the deterministic features stage (bk-z5t.8). Operates on 'transcribed'
@@ -8,10 +9,6 @@ import { runFeatures } from "@/ingest/features";
 //   bun run ingest:features -- --limit 50
 //   bun run ingest:features -- --dry
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
 
 async function main(): Promise<void> {
   const limit = Number(arg("--limit") ?? 500);
