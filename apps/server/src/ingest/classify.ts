@@ -269,11 +269,14 @@ export async function runClassify(opts: {
         score: c.learning_score,
       });
     } catch (err) {
-      results.push({
-        videoId: row.id,
-        ok: false,
-        error: (err as Error).message,
-      });
+      const message = (err as Error).message;
+      if (opts.persist) {
+        await db
+          .update(ingestVideo)
+          .set({ status: "failed", error: message, updatedAt: new Date() })
+          .where(eq(ingestVideo.id, row.id));
+      }
+      results.push({ videoId: row.id, ok: false, error: message });
     }
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }

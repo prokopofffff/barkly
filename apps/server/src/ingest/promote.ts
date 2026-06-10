@@ -158,7 +158,14 @@ export async function runPromote(opts: {
 
       results.push({ videoId: row.id, ok: true });
     } catch (err) {
-      results.push({ videoId: row.id, ok: false, error: (err as Error).message });
+      const message = (err as Error).message;
+      if (opts.persist) {
+        await db
+          .update(ingestVideo)
+          .set({ status: "failed", error: message, updatedAt: new Date() })
+          .where(eq(ingestVideo.id, row.id));
+      }
+      results.push({ videoId: row.id, ok: false, error: message });
     }
   }
 
