@@ -136,6 +136,7 @@ export async function runPromote(opts: {
         youtubeId: row.id,
         langCode: "en",
         level: row.level ?? "A2",
+        difficulty: Math.round(row.prior ?? 0),
         createdAt: Date.now(),
       };
 
