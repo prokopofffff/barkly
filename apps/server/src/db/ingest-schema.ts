@@ -161,8 +161,9 @@ export const videoClassification = pgTable("video_classification", {
   speechClarity: integer("speech_clarity").notNull().default(0), // 1-10
   learningScore: integer("learning_score").notNull().default(0), // 0-100
   englishLevel: text("english_level"), // coarse LLM hint (A1..C2), advisory only
-  // Anchored 1-5 difficulty sub-ratings (bk-z5t.16); feed the difficulty prior.
+  // Anchored 1-5 difficulty sub-ratings (bk-z5t.16/.17); feed the difficulty prior.
   idiomDensity: integer("idiom_density").notNull().default(1),
+  slangDensity: integer("slang_density").notNull().default(1),
   syntaxComplexity: integer("syntax_complexity").notNull().default(1),
   abstractness: integer("abstractness").notNull().default(1),
   model: text("model").notNull().default(""),

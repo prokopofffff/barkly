@@ -44,8 +44,9 @@ export const classificationSchema = z.object({
   speech_clarity: z.number().int().min(0).max(10),
   learning_score: z.number().int().min(0).max(100),
   has_dialogue: z.boolean(),
-  // Anchored 1-5 difficulty sub-ratings (bk-z5t.16).
+  // Anchored 1-5 difficulty sub-ratings (bk-z5t.16/.17).
   idiom_density: z.number().int().min(1).max(5),
+  slang_density: z.number().int().min(1).max(5),
   syntax_complexity: z.number().int().min(1).max(5),
   abstractness: z.number().int().min(1).max(5),
 });
@@ -72,6 +73,7 @@ export const CLASSIFICATION_JSON_SCHEMA = {
     learning_score: { type: "integer" },
     has_dialogue: { type: "boolean" },
     idiom_density: { type: "integer" },
+    slang_density: { type: "integer" },
     syntax_complexity: { type: "integer" },
     abstractness: { type: "integer" },
   },
@@ -89,6 +91,7 @@ export const CLASSIFICATION_JSON_SCHEMA = {
     "learning_score",
     "has_dialogue",
     "idiom_density",
+    "slang_density",
     "syntax_complexity",
     "abstractness",
   ],
@@ -111,7 +114,8 @@ CLASSIFICATION:
 - "has_dialogue": true if two or more people converse (vs a single narrator/monologue).
 
 DIFFICULTY — rate each 1–5 using these exact anchors (be strict and consistent; judge ONLY from the transcript):
-- "idiom_density" (phrasal verbs, idioms, slang): 1 = fully literal, none; 2 = one common phrasal verb; 3 = several phrasal verbs or a common idiom; 4 = frequent idioms/phrasal verbs/slang; 5 = dense idiomatic/slang, hard to read literally.
+- "idiom_density" (phrasal verbs and idioms only — NOT slang): 1 = fully literal, none; 2 = one common phrasal verb; 3 = several phrasal verbs or a common idiom; 4 = frequent idioms/phrasal verbs; 5 = dense idiomatic, hard to read literally.
+- "slang_density" (informal/colloquial/slang words: "gonna", "kinda", "dude", "lit", "y'all", etc.): 1 = standard/neutral or formal English; 2 = one casual word; 3 = several casual/colloquial words; 4 = frequent slang; 5 = heavy slang / very informal, hard for a textbook learner.
 - "syntax_complexity": 1 = short simple sentences; 2 = mostly simple, some compound; 3 = mix of compound and complex; 4 = long sentences with subordinate clauses; 5 = very long sentences with multiple embedded clauses.
 - "abstractness": 1 = concrete everyday objects/actions; 2 = mostly concrete; 3 = mix of concrete and abstract; 4 = largely abstract/conceptual; 5 = highly abstract, technical, or philosophical.`;
 
@@ -233,6 +237,7 @@ export async function runClassify(opts: {
             learningScore: c.learning_score,
             englishLevel: c.english_level,
             idiomDensity: c.idiom_density,
+            slangDensity: c.slang_density,
             syntaxComplexity: c.syntax_complexity,
             abstractness: c.abstractness,
             model,
@@ -254,6 +259,7 @@ export async function runClassify(opts: {
               learningScore: c.learning_score,
               englishLevel: c.english_level,
               idiomDensity: c.idiom_density,
+              slangDensity: c.slang_density,
               syntaxComplexity: c.syntax_complexity,
               abstractness: c.abstractness,
               model,

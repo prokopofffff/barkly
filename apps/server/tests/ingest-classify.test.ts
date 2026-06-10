@@ -22,6 +22,7 @@ const safe: Classification = {
   learning_score: 82,
   has_dialogue: false,
   idiom_density: 2,
+  slang_density: 1,
   syntax_complexity: 3,
   abstractness: 2,
 };

@@ -7,6 +7,7 @@ const easy: DifficultyInput = {
   avgSentenceLen: 6, // short sentences
   speechClarity: 10, // crystal clear
   idiomDensity: 1,
+  slangDensity: 1,
   syntaxComplexity: 1,
   abstractness: 1,
 };
@@ -17,6 +18,7 @@ const hard: DifficultyInput = {
   avgSentenceLen: 24, // long sentences
   speechClarity: 2, // muddy
   idiomDensity: 5,
+  slangDensity: 5,
   syntaxComplexity: 5,
   abstractness: 5,
 };
@@ -45,15 +47,16 @@ describe("computeDifficultyPrior", () => {
   });
 
   test("each rubric rating monotonically raises difficulty", () => {
-    expect(computeDifficultyPrior({ ...easy, idiomDensity: 5 })).toBeGreaterThan(
-      computeDifficultyPrior(easy),
-    );
-    expect(computeDifficultyPrior({ ...easy, syntaxComplexity: 5 })).toBeGreaterThan(
-      computeDifficultyPrior(easy),
-    );
-    expect(computeDifficultyPrior({ ...easy, abstractness: 5 })).toBeGreaterThan(
-      computeDifficultyPrior(easy),
-    );
+    for (const k of [
+      "idiomDensity",
+      "slangDensity",
+      "syntaxComplexity",
+      "abstractness",
+    ] as const) {
+      expect(computeDifficultyPrior({ ...easy, [k]: 5 })).toBeGreaterThan(
+        computeDifficultyPrior(easy),
+      );
+    }
   });
 
   test("clamps out-of-range inputs", () => {
@@ -64,6 +67,7 @@ describe("computeDifficultyPrior", () => {
         avgSentenceLen: 999,
         speechClarity: 0,
         idiomDensity: 5,
+        slangDensity: 5,
         syntaxComplexity: 5,
         abstractness: 5,
       }),

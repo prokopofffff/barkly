@@ -49,13 +49,14 @@ async function main(): Promise<void> {
       avgSentenceLen: f.avgSentenceLen,
       speechClarity: c.speech_clarity,
       idiomDensity: c.idiom_density,
+      slangDensity: c.slang_density,
       syntaxComplexity: c.syntax_complexity,
       abstractness: c.abstractness,
     });
     priors.push(prior);
     console.log(
-      `  run ${i}: idiom=${c.idiom_density} syntax=${c.syntax_complexity} ` +
-        `abstract=${c.abstractness} clarity=${c.speech_clarity} -> prior ${prior}`,
+      `  run ${i}: idiom=${c.idiom_density} slang=${c.slang_density} ` +
+        `syntax=${c.syntax_complexity} abstract=${c.abstractness} clarity=${c.speech_clarity} -> prior ${prior}`,
     );
   }
 

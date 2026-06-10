@@ -18,13 +18,14 @@ export const BOUNDS = {
 // weighting keeps the prior stable across runs.
 export const WEIGHTS = {
   // deterministic
-  wpm: 0.15,
-  rareWordRatio: 0.15,
+  wpm: 0.18, // speech speed — bumped (bk-z5t.17)
+  rareWordRatio: 0.12,
   avgSentenceLen: 0.1,
   // LLM rubric (1-5)
-  idiomDensity: 0.2,
-  syntaxComplexity: 0.15,
-  abstractness: 0.15,
+  idiomDensity: 0.15, // idioms + phrasal verbs
+  slangDensity: 0.12, // informal/colloquial/slang (bk-z5t.17)
+  syntaxComplexity: 0.13,
+  abstractness: 0.1,
   clarity: 0.1, // inverse: clearer speech -> easier
 } as const;
 
@@ -43,6 +44,7 @@ export type DifficultyInput = {
   readonly avgSentenceLen: number;
   readonly speechClarity: number; // 0-10 (higher = clearer)
   readonly idiomDensity: number; // 1-5
+  readonly slangDensity: number; // 1-5
   readonly syntaxComplexity: number; // 1-5
   readonly abstractness: number; // 1-5
 };
@@ -68,6 +70,7 @@ export function computeDifficultyPrior(input: DifficultyInput): number {
     WEIGHTS.rareWordRatio * rare +
     WEIGHTS.avgSentenceLen * sentence +
     WEIGHTS.idiomDensity * rating01(input.idiomDensity) +
+    WEIGHTS.slangDensity * rating01(input.slangDensity) +
     WEIGHTS.syntaxComplexity * rating01(input.syntaxComplexity) +
     WEIGHTS.abstractness * rating01(input.abstractness) +
     WEIGHTS.clarity * clarity;
@@ -100,6 +103,7 @@ export async function runDifficulty(opts: {
       avgSentenceLen: videoFeatures.avgSentenceLen,
       speechClarity: videoClassification.speechClarity,
       idiomDensity: videoClassification.idiomDensity,
+      slangDensity: videoClassification.slangDensity,
       syntaxComplexity: videoClassification.syntaxComplexity,
       abstractness: videoClassification.abstractness,
     })
@@ -121,6 +125,7 @@ export async function runDifficulty(opts: {
         avgSentenceLen: row.avgSentenceLen,
         speechClarity: row.speechClarity,
         idiomDensity: row.idiomDensity,
+        slangDensity: row.slangDensity,
         syntaxComplexity: row.syntaxComplexity,
         abstractness: row.abstractness,
       });
