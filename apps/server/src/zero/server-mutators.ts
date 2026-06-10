@@ -2,6 +2,11 @@ import type { CustomMutatorDefs, ServerTransaction } from "@rocicorp/zero/server
 import type { PostgresJsTransaction } from "@rocicorp/zero/server/adapters/postgresjs";
 import { createMutators, type Quiz, type Schema } from "@barkly/zero";
 import { applyEarn, gradeQuiz } from "@/domain/lessons/economy";
+import {
+  applyEloResult,
+  applyRewatchPenalty,
+  DEFAULT_ELO,
+} from "@/domain/lessons/elo";
 
 // Authoritative server mutators (BACKEND_PLAN §5). The push endpoint re-runs the
 // SAME-named mutators the client applies optimistically, but here we:
@@ -50,10 +55,28 @@ export function createServerMutators(ctx: ServerCtx): CustomMutatorDefs<Tx> {
 
     async completeQuiz(tx, a) {
       const userID = requireUser();
-      const video = await one(tx, 'SELECT quiz FROM video WHERE id = $1', [a.videoID]);
+      const video = await one(tx, "SELECT quiz, difficulty FROM video WHERE id = $1", [a.videoID]);
       if (!video) throw new Error("video not found");
       const quiz = video.quiz as Quiz; // jsonb → object (postgres-js parses it)
       const correct = gradeQuiz(quiz, a.selected);
+
+      // Adaptive ELO (bk-z5t.19). First genuine attempt moves the rating by the
+      // graded result; a re-attempt (rewatch + retry) only ever costs a little
+      // and never grants ELO — so the rating can't be farmed by replaying.
+      const priorProgress = await one(
+        tx,
+        "SELECT id FROM progress WHERE user_id = $1 AND video_id = $2",
+        [userID, a.videoID],
+      );
+      const u = await one(tx, 'SELECT elo, elo_games FROM "user" WHERE id = $1', [userID]);
+      const state = {
+        elo: Number(u?.elo ?? DEFAULT_ELO),
+        games: Number(u?.elo_games ?? 0),
+      };
+      const next = priorProgress
+        ? applyRewatchPenalty(state)
+        : applyEloResult(state, Number(video.difficulty ?? 0), quiz.type, correct);
+      await tx.mutate.user.update({ id: userID, elo: next.elo, eloGames: next.games });
 
       await tx.mutate.progress.upsert({
         id: a.progressID,
