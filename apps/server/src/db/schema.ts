@@ -19,9 +19,13 @@ export const user = pgTable("user", {
   learningLang: text("learning_lang").notNull().default("en"),
   // Onboarding answers (collected before the feed; synced so they carry across
   // devices once linked). `goals` is jsonb — Zero models arrays as json.
-  learningLevel: text("learning_level").notNull().default(""), // CEFR self-rating
+  learningLevel: text("learning_level").notNull().default(""), // onboarding self-assessment key -> seeds elo
   goals: jsonb("goals").$type<readonly string[]>().notNull().default([]),
   dailyTarget: integer("daily_target").notNull().default(0), // minutes/day goal
+  // Adaptive difficulty (bk-z5t.18): internal ELO on the same 0-1000+ scale as
+  // video.difficulty. Seeded from onboarding; moves with quiz performance.
+  elo: integer("elo").notNull().default(500),
+  eloGames: integer("elo_games").notNull().default(0), // answers counted (provisional ramp)
   level: integer("level").notNull().default(1),
   levelName: text("level_name").notNull().default(""),
   xp: integer("xp").notNull().default(0),
@@ -58,8 +62,14 @@ export const video = pgTable("video", {
   subtitle: jsonb("subtitle").$type<readonly SubtitleToken[]>().notNull(),
   quiz: jsonb("quiz").$type<Quiz>().notNull(),
   hlsUrl: text("hls_url").notNull(),
+  // Set for clips played via the YouTube IFrame embed (the ingestion pipeline's
+  // output); null for self-hosted/HLS clips. The mobile feed embeds by this id.
+  youtubeId: text("youtube_id"),
   langCode: text("lang_code").notNull(),
   level: text("level").notNull(),
+  // Difficulty on the ELO scale (0-1000), synced from the ingestion prior.
+  // Feeds adaptive matchmaking (user.elo ± window). bk-z5t.18.
+  difficulty: integer("difficulty").notNull().default(0),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 

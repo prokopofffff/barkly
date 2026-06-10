@@ -18,11 +18,14 @@ import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
 
 const STEPS = 5;
 
+// Friendly self-assessment — maps to a starting ELO server-side (no CEFR shown).
+// Keys must match ELO_SEED in apps/server/src/domain/lessons/elo.ts.
 const LEVELS = [
-  { k: 'A1', t: 'Новичок', d: 'Знаю пару слов', e: '🌱' },
-  { k: 'A2', t: 'Базовый', d: 'Понимаю простые фразы', e: '🌿' },
-  { k: 'B1', t: 'Средний', d: 'Смотрю с субтитрами', e: '🌳' },
-  { k: 'B2', t: 'Выше среднего', d: 'Свободно общаюсь', e: '🚀' },
+  { k: 'only_starting', t: 'Только начинаю', d: 'Знаю пару слов', e: '🌱' },
+  { k: 'knows_basics', t: 'Знаю основы', d: 'Понимаю простые фразы', e: '🌿' },
+  { k: 'intermediate', t: 'Средний уровень', d: 'Смотрю с субтитрами', e: '🌳' },
+  { k: 'confident', t: 'Уверенно понимаю', d: 'Свободно общаюсь', e: '🚀' },
+  { k: 'fluent', t: 'Свободно', d: 'Почти как родной', e: '🦅' },
 ] as const;
 
 const GOALS = [
@@ -150,7 +153,6 @@ export default function OnboardingScreen() {
                   emoji={o.e}
                   title={o.t}
                   desc={o.d}
-                  badge={o.k}
                 />
               ))}
             </OnbStep>

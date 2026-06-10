@@ -36,7 +36,7 @@ const STORE_KEY = 'barkly.profile.v1';
 export const LINK_PROMPT_QUIZ_THRESHOLD = 5;
 
 export type OnboardingPrefs = {
-  level: string; // CEFR self-rating: A1 / A2 / B1 / B2
+  level: string; // self-assessment key (only_starting…fluent) -> starting ELO
   goals: string[]; // why they're learning (travel, work, …)
   target: number; // daily-minutes goal
 };

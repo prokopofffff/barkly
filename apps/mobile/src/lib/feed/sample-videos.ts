@@ -40,6 +40,8 @@ export type FeedVideoItem = {
   subtitle: SubtitleToken[];
   quiz: Quiz;
   hlsUrl: string;
+  /** When set, the clip is an embedded YouTube Short played by its id. */
+  youtubeId?: string;
 };
 
 export const SAMPLE_VIDEOS: FeedVideoItem[] = [

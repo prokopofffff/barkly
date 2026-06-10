@@ -14,10 +14,12 @@ import { useZero } from '@rocicorp/zero/react';
  * data via `useFallbackQuery` (see src/lib/zero/hooks.ts).
  */
 
-/** Feed: clips for the user's learning language, newest first. */
+/** Candidate pool for the feed: clips in the user's learning language. The
+ * screen matches them to the user's ELO client-side (see hooks.ts matchmake),
+ * so we fetch a broad pool rather than a fixed 50. */
 export function useFeedQuery(learningLang: string) {
   const z = useZero();
-  return z.query.video.where('langCode', '=', learningLang).orderBy('createdAt', 'desc').limit(50);
+  return z.query.video.where('langCode', '=', learningLang).orderBy('createdAt', 'desc').limit(300);
 }
 
 /** The signed-in user's row (gamification counters, equipped cosmetic, …). */
