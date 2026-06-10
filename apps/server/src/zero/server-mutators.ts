@@ -6,6 +6,7 @@ import {
   applyEloResult,
   applyRewatchPenalty,
   DEFAULT_ELO,
+  seedElo,
 } from "@/domain/lessons/elo";
 
 // Authoritative server mutators (BACKEND_PLAN §5). The push endpoint re-runs the
@@ -51,6 +52,22 @@ export function createServerMutators(ctx: ServerCtx): CustomMutatorDefs<Tx> {
 
     async earnXp(tx, a) {
       await awardXp(tx, requireUser(), a.amount);
+    },
+
+    // Seed the starting ELO from the onboarding self-assessment (authoritative;
+    // identity from the JWT). `learningLevel` now carries the friendly key
+    // (only_starting…fluent), not a CEFR letter.
+    async completeOnboarding(tx, a) {
+      await tx.mutate.user.update({
+        id: requireUser(),
+        learningLang: a.learningLang,
+        learningLevel: a.learningLevel,
+        goals: a.goals,
+        dailyTarget: a.dailyTarget,
+        onboarded: true,
+        elo: seedElo(a.learningLevel),
+        eloGames: 0,
+      });
     },
 
     async completeQuiz(tx, a) {

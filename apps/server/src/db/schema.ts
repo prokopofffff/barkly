@@ -19,7 +19,7 @@ export const user = pgTable("user", {
   learningLang: text("learning_lang").notNull().default("en"),
   // Onboarding answers (collected before the feed; synced so they carry across
   // devices once linked). `goals` is jsonb — Zero models arrays as json.
-  learningLevel: text("learning_level").notNull().default(""), // CEFR self-rating
+  learningLevel: text("learning_level").notNull().default(""), // onboarding self-assessment key -> seeds elo
   goals: jsonb("goals").$type<readonly string[]>().notNull().default([]),
   dailyTarget: integer("daily_target").notNull().default(0), // minutes/day goal
   // Adaptive difficulty (bk-z5t.18): internal ELO on the same 0-1000+ scale as
