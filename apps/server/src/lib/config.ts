@@ -40,6 +40,14 @@ const envSchema = z.object({
   //                  guarantee, carries Claude Code's system-prompt overhead.
   LLM_PROVIDER: z.enum(["api", "claude_cli"]).default("api"),
   CLAUDE_CLI_BIN: z.string().default("claude"),
+
+  // Curator submission (bk-jaz.9.2): when true, a queued submission fire-and-
+  // forget triggers a single-flight pipeline drain so the clip reaches the feed
+  // without a cron. Set false in production and run a dedicated worker instead.
+  CURATOR_AUTOPROCESS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
 });
 
 export type Config = z.infer<typeof envSchema>;

@@ -291,6 +291,18 @@ writes the embed-only `video` row:
 The app just plays `youtube_id` via the IFrame player (bk-z5t.14); `hls_url`/`thumb`
 stay empty for embedded clips.
 
+**Implemented (bk-jaz.9.1 + .9.2):**
+
+- `user.role` (`basic`/`curator`/`admin`), synced so the mobile UI reacts to a grant
+  live. `ADMIN_USER_IDS` env bootstraps the first admins.
+- `POST /admin/role` `{ userID, role }` — admin-only grant/revoke (vetting is manual,
+  by email). Gated by the **effective** role (DB + env), not the JWT claim.
+- `POST /curator/videos` `{ url }` — curator/admin submit; `202` when newly queued,
+  `200` when already in the feed/pipeline. `GET /curator/videos/:id` reports pipeline
+  status for the UI to poll.
+- `CURATOR_AUTOPROCESS=true` fire-and-forget drains the queue (single-flight) after a
+  submission; set `false` in production and run a dedicated worker (§8).
+
 ---
 
 ## 8. Periodic / async jobs
