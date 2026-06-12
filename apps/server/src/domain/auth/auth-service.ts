@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { authIdentity } from "@/db/auth-schema";
-import { mintTokens, type TokenPair } from "@/lib/jwt";
+import { mintTokens, type Role, type TokenPair } from "@/lib/jwt";
 import { mergeAccounts } from "@/domain/auth/merge";
 
 // Anonymous-first auth service (DEV_STANDARDS §9, BACKEND_PLAN §6). Owns the
@@ -27,6 +27,7 @@ export type Session = {
   userID: string;
   isAnonymous: boolean;
   email?: string;
+  role: Role;
 } & TokenPair;
 
 function shortId(): string {
@@ -43,8 +44,8 @@ export async function createAnonymousUser(): Promise<Session> {
     isAnonymous: true,
     createdAt: Date.now(),
   });
-  const tokens = await mintTokens(userID, true);
-  return { userID, isAnonymous: true, ...tokens };
+  const tokens = await mintTokens(userID, true, "basic");
+  return { userID, isAnonymous: true, role: "basic", ...tokens };
 }
 
 /**
@@ -109,7 +110,10 @@ export async function linkIdentity(args: {
       .where(eq(s.user.id, canonical));
 
     const [row] = await tx.select().from(s.user).where(eq(s.user.id, canonical));
-    const tokens = await mintTokens(canonical, false);
-    return { userID: canonical, isAnonymous: false, email: row?.email ?? undefined, ...tokens };
+    // Mint with the stored role. Env-admin bootstrap is applied authoritatively
+    // by roles.ts effectiveRole() at the gate, not baked into the token here.
+    const role: Role = row?.role ?? "basic";
+    const tokens = await mintTokens(canonical, false, role);
+    return { userID: canonical, isAnonymous: false, email: row?.email ?? undefined, role, ...tokens };
   });
 }

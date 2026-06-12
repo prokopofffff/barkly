@@ -8,6 +8,14 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(1),
 
+  // Bootstrap admins (bk-jaz.9.1): comma-separated user IDs always treated as
+  // role "admin", regardless of the DB column. Solves the chicken-and-egg of
+  // granting the first curator — these IDs can grant roles via /admin/role.
+  ADMIN_USER_IDS: z
+    .string()
+    .default("")
+    .transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean)),
+
   // Yandex Object Storage (S3-compatible). Optional at boot: only the ingestion
   // pipeline needs them, so the API can run without media access. lib/storage.ts
   // fails fast if used while the keys are absent.

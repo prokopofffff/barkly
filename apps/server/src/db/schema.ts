@@ -15,6 +15,11 @@ export const user = pgTable("user", {
   name: text("name").notNull(),
   isAnonymous: boolean("is_anonymous").notNull().default(true),
   email: text("email"), // set when an email identity is linked; null otherwise
+  // Content-submission role (bk-jaz.9.1). "basic" = learner (default), "curator"
+  // = vetted user who may submit YouTube Shorts, "admin" = team. Synced so the
+  // mobile UI can show the curator submission UI vs the "be our curator" button
+  // live (no re-login after a grant). Authoritative grants go through /admin/role.
+  role: text("role").$type<"admin" | "curator" | "basic">().notNull().default("basic"),
   nativeLang: text("native_lang").notNull().default("ru"),
   learningLang: text("learning_lang").notNull().default("en"),
   // Onboarding answers (collected before the feed; synced so they carry across

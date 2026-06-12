@@ -13,12 +13,19 @@ const secret = new TextEncoder().encode(config.JWT_SECRET);
 const ACCESS_TTL = "1h";
 const REFRESH_TTL = "30d";
 
-export type Claims = { sub: string; anon: boolean };
+/** Content-submission role (bk-jaz.9.1). See db/schema.ts `user.role`. */
+export type Role = "admin" | "curator" | "basic";
+
+export type Claims = { sub: string; anon: boolean; role: Role };
 
 export type TokenPair = { token: string; refreshToken: string };
 
-export async function mintTokens(userID: string, isAnonymous: boolean): Promise<TokenPair> {
-  const token = await new SignJWT({ anon: isAnonymous })
+export async function mintTokens(
+  userID: string,
+  isAnonymous: boolean,
+  role: Role = "basic",
+): Promise<TokenPair> {
+  const token = await new SignJWT({ anon: isAnonymous, role })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userID)
     .setIssuedAt()
@@ -38,7 +45,8 @@ export async function mintTokens(userID: string, isAnonymous: boolean): Promise<
 export async function verifyToken(token: string): Promise<Claims> {
   const { payload } = await jwtVerify(token, secret);
   if (typeof payload.sub !== "string") throw new Error("token missing sub");
-  return { sub: payload.sub, anon: payload.anon === true };
+  const role: Role = payload.role === "admin" || payload.role === "curator" ? payload.role : "basic";
+  return { sub: payload.sub, anon: payload.anon === true, role };
 }
 
 /** Pull the raw JWT out of an `Authorization: Bearer <jwt>` header value. */
