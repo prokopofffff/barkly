@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@rocicorp/zero/react';
 
 import { Avatar } from '@/components/avatar';
 import { Icon, type IconName } from '@/components/icon';
@@ -17,6 +18,7 @@ import { ACHIEVEMENTS, USER } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
 import { useLocalProfile } from '@/lib/profile/local-profile';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
+import { useCurrentUserQuery } from '@/lib/zero/queries';
 
 const WEEK = [40, 70, 30, 90, 55, 100, 65];
 const DAYS = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
@@ -32,6 +34,8 @@ export default function ProfileScreen() {
   const { state, savedWords, cosmetic } = useGame();
   const { user } = useAuth();
   const { linkPromptDismissed } = useLocalProfile();
+  const [me] = useQuery(useCurrentUserQuery(user?.userID ?? ''));
+  const isCurator = me?.role === 'curator' || me?.role === 'admin';
 
   // Profile is the account hub: nudge an anonymous learner to secure progress.
   const showLinkCard = !!user?.isAnonymous && !linkPromptDismissed;
@@ -188,6 +192,37 @@ export default function ProfileScreen() {
           >
             <Text className="font-nunito-x" style={{ color: '#ffb37a', fontSize: 12 }}>
               Повторить
+            </Text>
+          </View>
+          <Icon name="chevR" size={18} color={COLORS.textFaint} />
+        </Pressable>
+      </View>
+
+      {/* curator: submit Shorts (curator/admin) or apply (basic) — bk-jaz.9.3 */}
+      <View style={{ paddingHorizontal: 22, paddingTop: 12 }}>
+        <Pressable
+          onPress={() => router.push('/curator-submit')}
+          className="w-full flex-row items-center gap-3.5 rounded-[20px]"
+          style={{ padding: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line }}
+        >
+          <View
+            className="items-center justify-center rounded-[14px]"
+            style={{
+              width: 46,
+              height: 46,
+              backgroundColor: 'rgba(182,242,61,0.16)',
+              borderWidth: 1,
+              borderColor: 'rgba(182,242,61,0.4)',
+            }}
+          >
+            <Icon name={isCurator ? 'upload' : 'crown'} size={24} color={COLORS.lime} />
+          </View>
+          <View className="flex-1">
+            <Text className="font-nunito-x text-content" style={{ fontSize: 17 }}>
+              {isCurator ? 'Загрузить Shorts' : 'Стать куратором'}
+            </Text>
+            <Text className="font-nunito-bold" style={{ color: COLORS.textDim, fontSize: 13, marginTop: 2 }}>
+              {isCurator ? 'Добавить ролик в ленту по ссылке' : 'Добавляй видео и помогай другим учиться'}
             </Text>
           </View>
           <Icon name="chevR" size={18} color={COLORS.textFaint} />
