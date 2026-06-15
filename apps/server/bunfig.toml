@@ -1,0 +1,5 @@
+# Server-only Bun config. Preload sets the env that lib/config.ts requires at
+# import time, so `bun test` is deterministic regardless of test-file load order.
+# (Install/linker config lives in the repo-root bunfig.toml; install runs there.)
+[test]
+preload = ["./tests/setup.ts"]
