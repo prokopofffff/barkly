@@ -1,13 +1,10 @@
 import { useMemo } from 'react';
 import { useQuery } from '@rocicorp/zero/react';
-import { DEFAULT_ELO, PROVISIONAL_GAMES, type Video } from '@barkly/zero';
+import { DEFAULT_ELO, matchmake, type Video } from '@barkly/zero';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { SAMPLE_VIDEOS, type FeedVideoItem } from '@/lib/feed/sample-videos';
 import { useCurrentUserQuery, useFeedQuery } from '@/lib/zero/queries';
-
-const FEED_SIZE = 50;
-const MIN_IN_WINDOW = 15;
 
 /** Map a generated Zero `video` row to the screen's FeedVideoItem shape. */
 function mapVideoRow(v: Video): FeedVideoItem {
@@ -34,25 +31,6 @@ function mapVideoRow(v: Video): FeedVideoItem {
     hlsUrl: v.hlsUrl,
     youtubeId: v.youtubeId ?? undefined,
   };
-}
-
-/**
- * Adaptive ELO matchmaking: prefer clips within ±50 of the user's ELO; if too
- * few qualify, widen the window (wider while the rating is still provisional),
- * then return the nearest-by-difficulty clips. Pure for easy reasoning/testing.
- */
-export function matchmake(rows: readonly Video[], elo: number, games: number): Video[] {
-  const windows = games < PROVISIONAL_GAMES ? [250, 500, Infinity] : [50, 100, 200, Infinity];
-  const dist = (v: Video) => Math.abs((v.difficulty ?? 0) - elo);
-  let pool: readonly Video[] = rows;
-  for (const w of windows) {
-    const inWin = rows.filter((r) => dist(r) <= w);
-    if (inWin.length >= MIN_IN_WINDOW || w === Infinity) {
-      pool = inWin;
-      break;
-    }
-  }
-  return [...pool].sort((a, b) => dist(a) - dist(b)).slice(0, FEED_SIZE);
 }
 
 /**

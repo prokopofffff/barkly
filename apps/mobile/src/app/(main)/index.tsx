@@ -94,6 +94,10 @@ export default function FeedScreen() {
         showsVerticalScrollIndicator={false}
         viewabilityConfig={VIEWABILITY_CONFIG}
         onViewableItemsChanged={onViewableItemsChanged}
+        // Prefetch the next short: render ~one screen ahead so the adjacent
+        // FeedVideo mounts (its YouTube iframe loads paused, play={isActive}=false)
+        // before it scrolls into view — no black flash on swipe.
+        drawDistance={height}
       />
 
       {quizOpen && activeVideo && (

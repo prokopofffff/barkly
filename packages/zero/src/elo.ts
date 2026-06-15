@@ -71,3 +71,41 @@ export function applyEloResult(
 export function applyRewatchPenalty(state: EloState): EloState {
   return { elo: clampElo(state.elo - REWATCH_PENALTY), games: state.games };
 }
+
+// --- feed matchmaking (bk-z5t.21) --------------------------------------------
+
+// How many clips the matched feed returns, and the minimum that must fall inside
+// a window before we stop widening it.
+export const FEED_SIZE = 50;
+export const MIN_IN_WINDOW = 15;
+
+// Candidate windows (±ELO) tried in order. The provisional phase starts wider so
+// a noisy onboarding seed still fills the feed; once settled we match tighter.
+// Infinity = no filter (final fallback so the feed is never empty).
+export const MATCH_WINDOWS_PROVISIONAL: readonly number[] = [250, 500, Infinity];
+export const MATCH_WINDOWS_SETTLED: readonly number[] = [50, 100, 200, Infinity];
+
+/**
+ * Adaptive ELO matchmaking: prefer clips whose difficulty is near the user's
+ * ELO; if fewer than MIN_IN_WINDOW qualify, widen the window (wider while the
+ * rating is still provisional), then return the nearest-by-difficulty clips.
+ * Replaces "newest first" ordering. Pure + generic over any `{ difficulty }`
+ * row so it unit-tests without the full Zero schema.
+ */
+export function matchmake<T extends { difficulty: number | null }>(
+  rows: readonly T[],
+  elo: number,
+  games: number,
+): T[] {
+  const windows = games < PROVISIONAL_GAMES ? MATCH_WINDOWS_PROVISIONAL : MATCH_WINDOWS_SETTLED;
+  const dist = (v: T) => Math.abs((v.difficulty ?? 0) - elo);
+  let pool: readonly T[] = rows;
+  for (const w of windows) {
+    const inWin = rows.filter((r) => dist(r) <= w);
+    if (inWin.length >= MIN_IN_WINDOW || w === Infinity) {
+      pool = inWin;
+      break;
+    }
+  }
+  return [...pool].sort((a, b) => dist(a) - dist(b)).slice(0, FEED_SIZE);
+}

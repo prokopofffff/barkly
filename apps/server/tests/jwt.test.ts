@@ -14,6 +14,13 @@ describe("jwt", () => {
     const claims = await verifyToken(token);
     expect(claims.sub).toBe("anon_abc");
     expect(claims.anon).toBe(true);
+    expect(claims.role).toBe("basic"); // default role when none minted
+
+    // A minted role round-trips; an unknown/missing role falls back to "basic".
+    const curator = await mintTokens("u1", false, "curator");
+    expect((await verifyToken(curator.token)).role).toBe("curator");
+    const admin = await mintTokens("u2", false, "admin");
+    expect((await verifyToken(admin.token)).role).toBe("admin");
 
     await expect(verifyToken("not-a-jwt")).rejects.toThrow();
   });

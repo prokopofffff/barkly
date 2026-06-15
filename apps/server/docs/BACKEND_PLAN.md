@@ -252,16 +252,56 @@ Per-field merge policy (server-authoritative — recompute, never trust the clie
 
 ---
 
-## 7. Media pipeline (never synced through Zero)
+## 7. Content pipeline — YouTube Shorts embed-only (MVP)
 
-`video.hls_url`/`thumb` are pointers only. Build:
+**MVP decision:** the app shows **only YouTube Shorts**, embedded via the official
+IFrame player (`video.youtube_id` set, `video.hls_url = ""`). We store, download, or
+transcode **no** video server-side. The self-hosted media path (signed upload → object
+storage → `ffmpeg`/HLS → poster/CDN, `lib/storage.ts` + `ingest/download.ts` +
+`ingest/ffmpeg.ts`) is **retained in-tree but out of scope** for MVP; it returns when a
+real Studio upload flow lands.
 
-- **Upload** (Studio screen): signed direct-upload URL → object storage.
-- **Transcode** to HLS (Mux or `ffmpeg` workers), generate poster/thumbnail.
-- **Subtitle + quiz authoring**: ASR for captions, then the Studio editor's markers
-  produce the `subtitle`/`quiz` JSON saved on the `video` row. (Studio currently mocks
-  the timeline/AI-quiz; this is the real pipeline behind it.)
-- CDN in front; the app just plays `hls_url` via expo-video.
+Content reaches the feed two ways, both ending at the existing **promote** stage which
+writes the embed-only `video` row:
+
+- **Automated discovery** (current): allowlisted seed channels → `yt-dlp` enumerate
+  `/shorts` → ingest pipeline.
+- **Curator submission** (this work): a curator pastes a single YouTube Shorts URL.
+
+### Curator submission flow
+
+1. **Who may submit — curator + admin only.** Two roles for MVP:
+   - `admin` — full access (the team).
+   - `curator` — vetted users granted submission rights.
+   - Basic users see a **"Стать куратором"** ("Be our curator") button → submits an
+     application; we contact them by email to vet their skills before granting the role.
+   - Everywhere submission UI appears, show a banner: **"Скоро создавать видео смогут
+     все"** ("Creating videos will be open to everyone soon").
+2. **Endpoint** (`apps/server/src/routes`, curator/admin-gated by JWT role): accept a
+   YouTube URL → extract the video id.
+3. **Validate** via `yt-dlp` metadata that it is a playable, **embeddable** Short
+   (`playable_in_embed = true`, duration/format sanity).
+4. **Dedupe** against `video` + `ingest_video` (the YouTube id is the row id).
+5. **Inject** an `ingest_video` row and run it through the **full** existing pipeline —
+   `transcribe → features → classify → difficulty → lesson → promote`. No fast-path:
+   curator content still passes the LLM safety/topic gates, gets an ELO difficulty, and
+   gets its `subtitle` + `quiz` generated (both required for the learning UX).
+6. **Promote** writes the embed-only `video` row (`youtube_id` set, `hls_url = ""`).
+
+The app just plays `youtube_id` via the IFrame player (bk-z5t.14); `hls_url`/`thumb`
+stay empty for embedded clips.
+
+**Implemented (bk-jaz.9.1 + .9.2):**
+
+- `user.role` (`basic`/`curator`/`admin`), synced so the mobile UI reacts to a grant
+  live. `ADMIN_USER_IDS` env bootstraps the first admins.
+- `POST /admin/role` `{ userID, role }` — admin-only grant/revoke (vetting is manual,
+  by email). Gated by the **effective** role (DB + env), not the JWT claim.
+- `POST /curator/videos` `{ url }` — curator/admin submit; `202` when newly queued,
+  `200` when already in the feed/pipeline. `GET /curator/videos/:id` reports pipeline
+  status for the UI to poll.
+- `CURATOR_AUTOPROCESS=true` fire-and-forget drains the queue (single-flight) after a
+  submission; set `false` in production and run a dedicated worker (§8).
 
 ---
 

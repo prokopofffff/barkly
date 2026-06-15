@@ -8,6 +8,14 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(1),
 
+  // Bootstrap admins (bk-jaz.9.1): comma-separated user IDs always treated as
+  // role "admin", regardless of the DB column. Solves the chicken-and-egg of
+  // granting the first curator — these IDs can grant roles via /admin/role.
+  ADMIN_USER_IDS: z
+    .string()
+    .default("")
+    .transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean)),
+
   // Yandex Object Storage (S3-compatible). Optional at boot: only the ingestion
   // pipeline needs them, so the API can run without media access. lib/storage.ts
   // fails fast if used while the keys are absent.
@@ -32,6 +40,14 @@ const envSchema = z.object({
   //                  guarantee, carries Claude Code's system-prompt overhead.
   LLM_PROVIDER: z.enum(["api", "claude_cli"]).default("api"),
   CLAUDE_CLI_BIN: z.string().default("claude"),
+
+  // Curator submission (bk-jaz.9.2): when true, a queued submission fire-and-
+  // forget triggers a single-flight pipeline drain so the clip reaches the feed
+  // without a cron. Set false in production and run a dedicated worker instead.
+  CURATOR_AUTOPROCESS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
 });
 
 export type Config = z.infer<typeof envSchema>;
