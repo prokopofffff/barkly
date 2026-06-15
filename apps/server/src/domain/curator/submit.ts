@@ -79,11 +79,6 @@ export async function submitYouTubeShort(args: { url: string }): Promise<SubmitR
     })
     .onConflictDoNothing({ target: ingestChannel.id });
 
-  const stats: { views?: number; likes?: number; comments?: number } = {};
-  if (meta.views != null) stats.views = meta.views;
-  if (meta.likes != null) stats.likes = meta.likes;
-  if (meta.comments != null) stats.comments = meta.comments;
-
   await db
     .insert(ingestVideo)
     .values({
@@ -93,7 +88,11 @@ export async function submitYouTubeShort(args: { url: string }): Promise<SubmitR
       description: meta.description,
       durationS: meta.durationS,
       isShort: true,
-      stats,
+      stats: {
+        ...(meta.views != null ? { views: meta.views } : {}),
+        ...(meta.likes != null ? { likes: meta.likes } : {}),
+        ...(meta.comments != null ? { comments: meta.comments } : {}),
+      },
       status: "discovered",
     })
     .onConflictDoNothing({ target: ingestVideo.id });

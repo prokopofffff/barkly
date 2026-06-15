@@ -11,10 +11,6 @@ import { runPipeline } from "@/ingest/pipeline";
 
 let running = false;
 
-export function isDraining(): boolean {
-  return running;
-}
-
 export async function drainPipelineOnce(): Promise<void> {
   if (running) return;
   running = true;

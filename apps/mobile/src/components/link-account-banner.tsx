@@ -177,7 +177,8 @@ export function LinkAccountOverlay() {
   );
 }
 
-function Field(props: React.ComponentProps<typeof TextInput>) {
+/** Shared styled text input (lime-on-dark, rounded). Reused by other forms. */
+export function Field(props: React.ComponentProps<typeof TextInput>) {
   return (
     <TextInput
       placeholderTextColor={COLORS.textFaint}

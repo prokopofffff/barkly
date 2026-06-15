@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useQuery } from '@rocicorp/zero/react';
 
 import { Icon } from '@/components/icon';
 import { IconButton } from '@/components/icon-button';
+import { Field } from '@/components/link-account-banner';
 import { COLORS } from '@/constants/gav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserQuery } from '@/lib/zero/queries';
@@ -133,7 +134,7 @@ function SubmitForm({ token }: { token: string | null }) {
         Вставь ссылку на YouTube Shorts. Мы проверим ролик, сделаем субтитры и квиз — и добавим его в ленту.
       </Text>
 
-      <TextInput
+      <Field
         value={url}
         onChangeText={(t) => {
           setUrl(t);
@@ -141,22 +142,11 @@ function SubmitForm({ token }: { token: string | null }) {
           setSuccess(null);
         }}
         placeholder="https://youtube.com/shorts/…"
-        placeholderTextColor={COLORS.textFaint}
         keyboardType="url"
         autoCapitalize="none"
         autoCorrect={false}
         editable={!submitting}
         onSubmitEditing={submit}
-        className="font-nunito-bold text-content"
-        style={{
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderRadius: 16,
-          fontSize: 15,
-          backgroundColor: COLORS.surface2,
-          borderWidth: 1,
-          borderColor: COLORS.line2,
-        }}
       />
 
       {error && (

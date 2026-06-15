@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "@/lib/config";
-import { bearerToken, verifyToken } from "@/lib/jwt";
 import { AuthError } from "@/domain/auth/auth-service";
 import { requireRole } from "@/domain/auth/roles";
 import { submitYouTubeShort, SubmitError } from "@/domain/curator/submit";
 import { drainPipelineOnce } from "@/ingest/drain";
+import { mapRouteError, requireUser } from "@/routes/http";
 
 // Curator surface (bk-jaz.9.2). A vetted curator/admin pastes a YouTube Shorts
 // URL → we validate + queue it into the ingest pipeline. Gated by the EFFECTIVE
@@ -15,7 +15,6 @@ import { drainPipelineOnce } from "@/ingest/drain";
 
 export const curator = new Hono();
 
-const STATUS = { invalid_credentials: 401, not_found: 404, bad_request: 400 } as const;
 const SUBMIT_STATUS = {
   invalid_url: 400,
   not_embeddable: 422,
@@ -25,26 +24,19 @@ const SUBMIT_STATUS = {
 
 /** Verify the bearer token and require at least the curator role. */
 async function requireCurator(authorization: string | undefined): Promise<string> {
-  const token = bearerToken(authorization);
-  if (!token) throw new AuthError("bad_request", "missing bearer token");
-  let userID: string;
-  try {
-    userID = (await verifyToken(token)).sub;
-  } catch {
-    throw new AuthError("invalid_credentials", "invalid token");
-  }
+  const userID = await requireUser(authorization);
   await requireRole(userID, "curator"); // throws invalid_credentials if below
   return userID;
 }
 
+// Like the shared handle(), but the success path carries its own status (202
+// queued vs 200 duplicate), and SubmitError maps before the common errors.
 async function handle(fn: () => Promise<{ status: number; body: unknown }>) {
   try {
     return await fn();
   } catch (err) {
     if (err instanceof SubmitError) return { status: SUBMIT_STATUS[err.code], body: { error: err.code } };
-    if (err instanceof AuthError) return { status: STATUS[err.code], body: { error: err.code } };
-    if (err instanceof z.ZodError) return { status: 400, body: { error: "bad_request" } };
-    throw err;
+    return mapRouteError(err);
   }
 }
 
