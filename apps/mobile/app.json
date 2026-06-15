@@ -38,7 +38,8 @@
       "expo-video",
       "expo-sqlite",
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
