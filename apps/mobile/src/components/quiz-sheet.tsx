@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { Sharik } from '@/components/mascot';
@@ -26,6 +27,7 @@ const TYPE_LABEL: Record<Quiz['type'], string> = {
 
 /** Bottom-sheet quiz: mc / meaning / fill / reorder, then a feedback panel. */
 export function QuizSheet({ quiz, onClose, onResult }: Props) {
+  const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<'q' | 'feedback'>('q');
   const [correct, setCorrect] = useState(false);
   const [sel, setSel] = useState<number | null>(null); // mc / meaning / fill
@@ -59,7 +61,9 @@ export function QuizSheet({ quiz, onClose, onResult }: Props) {
           borderColor: COLORS.line2,
           paddingHorizontal: 18,
           paddingTop: 14,
-          paddingBottom: 24,
+          // Clear the floating BottomNav (absolute, ~59px + safe-area) so the
+          // "Проверить" / reward button is never hidden behind it.
+          paddingBottom: Math.max(insets.bottom, 12) + 76,
         }}
       >
         <View className="mb-4 h-[5px] w-10 self-center rounded-full" style={{ backgroundColor: COLORS.line2 }} />

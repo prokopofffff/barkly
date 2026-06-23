@@ -11,6 +11,8 @@
     "lint": "bun run --filter '*' lint",
     "mobile": "bun run --filter barkly-mobile start",
     "server": "bun run --filter barkly-back dev",
+    "backend": "bash apps/server/scripts/dev-stack.sh",
+    "backend:down": "bash apps/server/scripts/dev-stack-down.sh",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "trustedDependencies": [

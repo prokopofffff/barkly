@@ -59,7 +59,9 @@ export function CommentsSheet({ count, onClose }: Props) {
 
         <View
           className="flex-row items-center gap-2.5 px-[18px] pt-2.5"
-          style={{ borderTopWidth: 1, borderColor: COLORS.line, paddingBottom: Math.max(insets.bottom, 16) }}
+          // Clear the floating BottomNav (absolute, ~59px + safe-area) so the
+          // comment input isn't hidden behind it.
+          style={{ borderTopWidth: 1, borderColor: COLORS.line, paddingBottom: Math.max(insets.bottom, 12) + 76 }}
         >
           <Avatar name="Аня" size={36} gradient="brand" ring={false} />
           <View className="flex-1 rounded-full bg-surface-2" style={{ paddingVertical: 11, paddingHorizontal: 14 }}>

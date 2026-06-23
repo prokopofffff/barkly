@@ -1,0 +1,25 @@
+# Local dev override, auto-merged by `docker compose`.
+#
+# We run the API on the HOST (`bun run dev`, hot-reload) rather than in the
+# `app` container, because the in-repo Dockerfile can't build this Bun monorepo
+# as-is (root bun.lock + the @barkly/zero workspace dependency). So:
+#   - zero-cache must push to the host gateway, not the in-network `app` service;
+#   - the `app` container is parked behind a profile and skipped by default.
+#
+# Host ports come from PG_PORT / ZERO_PORT (see scripts/dev-stack.sh), which
+# default to 5434 / 4849 to avoid clashing with other local stacks.
+services:
+  zero-cache:
+    # Pin the zero-cache image to the SAME version as the @rocicorp/zero client
+    # in the app (package.json). The base compose uses :latest, which on a given
+    # machine can be a stale older tag and then fails the sync handshake with
+    # "server is at sync protocol vN and does not support vN+1". Bump this in
+    # lockstep whenever @rocicorp/zero is upgraded.
+    image: rocicorp/zero:1.6.1
+    environment:
+      ZERO_PUSH_URL: http://host.docker.internal:3000/push
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  app:
+    profiles: ["full-docker"]

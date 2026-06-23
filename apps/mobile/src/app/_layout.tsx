@@ -1,4 +1,5 @@
 import '@/global.css';
+import '@/nativewind-interop';
 
 import {
   Nunito_400Regular,
