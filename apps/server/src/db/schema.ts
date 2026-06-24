@@ -71,7 +71,6 @@ export const video = pgTable("video", {
   // output); null for self-hosted/HLS clips. The mobile feed embeds by this id.
   youtubeId: text("youtube_id"),
   langCode: text("lang_code").notNull(),
-  level: text("level").notNull(),
   // Difficulty on the ELO scale (0-1000), synced from the ingestion prior.
   // Feeds adaptive matchmaking (user.elo ± window). bk-z5t.18.
   difficulty: integer("difficulty").notNull().default(0),

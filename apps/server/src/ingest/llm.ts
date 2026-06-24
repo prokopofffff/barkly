@@ -74,6 +74,12 @@ async function viaClaudeCli({ system, user, schema }: StructuredArgs) {
   return { text: extractJsonObject(env.result), model };
 }
 
+// Hard cap on a single CLI call. The subscription CLI occasionally hangs (no
+// output, never exits) under load — without a timeout one stuck call blocks a
+// whole stage forever. On timeout we kill the child and reject so the stage
+// records that row as failed and moves on (there are always more candidates).
+const CLI_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 90_000);
+
 function runClaude(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     // Strip API creds so the CLI authenticates with the Claude subscription
@@ -88,13 +94,26 @@ function runClaude(prompt: string): Promise<string> {
     );
     let out = "";
     let err = "";
+    let settled = false;
+    const done = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      done(() => reject(new Error(`claude timed out after ${CLI_TIMEOUT_MS}ms`)));
+    }, CLI_TIMEOUT_MS);
     child.stdout.on("data", (d: Buffer) => (out += d.toString()));
     child.stderr.on("data", (d: Buffer) => (err += d.toString()));
-    child.on("error", reject);
+    child.on("error", (e) => done(() => reject(e)));
     child.on("close", (code) =>
-      code === 0
-        ? resolve(out)
-        : reject(new Error(`claude exited ${code}: ${err.trim()}`)),
+      done(() =>
+        code === 0
+          ? resolve(out)
+          : reject(new Error(`claude exited ${code}: ${err.trim()}`)),
+      ),
     );
     child.stdin.write(prompt);
     child.stdin.end();

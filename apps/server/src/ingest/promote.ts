@@ -86,11 +86,9 @@ export async function runPromote(opts: {
   const rows = await db
     .select({
       id: ingestVideo.id,
-      stats: ingestVideo.stats,
       channelName: ingestChannel.title,
       channelHandle: ingestChannel.handle,
       topic: videoClassification.topic,
-      level: videoClassification.englishLevel,
       captionRu: videoLesson.captionRu,
       subtitle: videoLesson.subtitle,
       quiz: videoLesson.quiz,
@@ -112,7 +110,6 @@ export async function runPromote(opts: {
     try {
       if (!row.quiz) throw new Error("no quiz on lesson");
       const labels = topicLabels(row.topic);
-      const views = row.stats.views ?? 0;
 
       const videoRow = {
         id: row.id,
@@ -126,7 +123,9 @@ export async function runPromote(opts: {
         creatorMascot: false,
         bgGradient: pickBgGradient(row.id) as readonly [string, string],
         caption: row.captionRu,
-        likes: formatCount(views),
+        // Engagement counts come from OUR platform (the like/comment/repost
+        // tables), not YouTube — seed them at zero so real activity takes over.
+        likes: "0",
         comments: "0",
         shares: "0",
         tag: `#${row.topic}`,
@@ -135,7 +134,8 @@ export async function runPromote(opts: {
         hlsUrl: "",
         youtubeId: row.id,
         langCode: "en",
-        level: row.level ?? "A2",
+        // Difficulty is the ELO prior (0-1000); the app has no CEFR concept.
+        // The LLM english_level stays ingestion-only in video_classification.
         difficulty: Math.round(row.prior ?? 0),
         createdAt: Date.now(),
       };
