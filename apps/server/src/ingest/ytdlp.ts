@@ -111,6 +111,63 @@ export async function fetchChannelShorts(
   return parseChannelShorts(out);
 }
 
+// --- keyword search discovery (bk-44m) ---------------------------------------
+
+/** A single hit from a `ytsearch` query. Unlike a channel /shorts entry, each
+ * search hit can come from a different channel, so it carries its own channel
+ * attribution (resolved from the flat-playlist entry). */
+export type SearchEntry = {
+  readonly id: string;
+  readonly title: string;
+  readonly durationS: number | null;
+  readonly views: number | null;
+  readonly channelId: string | null; // UC… id of the hit's channel
+  readonly channelTitle: string | null;
+  readonly channelHandle: string | null; // @handle (uploader_id) when present
+};
+
+/** Parse the JSON from `yt-dlp --flat-playlist -J ytsearchN:<query>`. Each entry
+ * carries its own channel fields. Tolerant of missing fields / null entries. */
+export function parseSearchResults(json: string): SearchEntry[] {
+  const root = JSON.parse(json) as { entries?: unknown };
+  const rawEntries = Array.isArray(root.entries) ? root.entries : [];
+  const out: SearchEntry[] = [];
+  for (const raw of rawEntries) {
+    if (!raw || typeof raw !== "object") continue;
+    const e = raw as Record<string, unknown>;
+    const id = asString(e.id);
+    if (!id) continue;
+    out.push({
+      id,
+      title: asString(e.title) ?? "",
+      durationS: asNumber(e.duration),
+      views: asNumber(e.view_count),
+      channelId: asString(e.channel_id) ?? asString(e.uploader_id),
+      channelTitle: asString(e.channel) ?? asString(e.uploader),
+      channelHandle: asString(e.uploader_id),
+    });
+  }
+  return out;
+}
+
+/** Run a keyless YouTube search (no Data API key, no quota) and return up to
+ * `limit` flat hits with channel attribution. */
+export async function searchShorts(
+  query: string,
+  limit: number,
+): Promise<SearchEntry[]> {
+  const out = await runYtDlp([
+    "--flat-playlist",
+    "-J",
+    "--playlist-end",
+    String(limit),
+    "--no-warnings",
+    "--ignore-errors",
+    `ytsearch${limit}:${query}`,
+  ]);
+  return parseSearchResults(out);
+}
+
 // --- full single-video metadata (the pre-filter / download input) ------------
 
 export type VideoMeta = {

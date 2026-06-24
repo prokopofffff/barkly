@@ -1,8 +1,11 @@
 import { db } from "@/db";
 import * as s from "@/db/schema";
+import { seedVideos } from "@/db/seed-videos.gen";
 
-// Dev seed: one demo user plus the placeholder content the mobile app ships as
-// fallback, so a freshly-migrated database lights up every screen over Zero.
+// Dev seed: one demo user plus enough content to light up every screen over
+// Zero. The feed videos come from `seed-videos.gen.ts` — a snapshot of real,
+// pipeline-rated YouTube Shorts (regenerate with `bun run db:export-videos`);
+// the rest is hand-written placeholder data.
 // Run with `bun run db:seed` (after db:migrate). Idempotent via onConflictDoNothing.
 
 const now = Date.now();
@@ -35,159 +38,7 @@ async function seed() {
 
   await db
     .insert(s.video)
-    .values([
-      {
-        id: "v1",
-        category: "Сцена из фильма",
-        catEn: "MOVIE SCENE",
-        creatorName: "CineDose",
-        creatorHandle: "@cinedose",
-        creatorGradient: "fun",
-        creatorFollowers: "1.2M",
-        creatorVerified: true,
-        creatorMascot: false,
-        bgGradient: ["#3a1c5e", "#11122b"],
-        caption: "Лучшая сцена для отработки фразовых глаголов 🎬",
-        likes: "128K",
-        comments: "2.4K",
-        shares: "18K",
-        tag: "#movies",
-        subtitle: [
-          { w: "I" },
-          { w: "can't", t: "не могу" },
-          { w: "believe", t: "поверить", key: true },
-          { w: "you" },
-          { w: "pulled", t: "провернул", key: true },
-          { w: "this" },
-          { w: "off", t: "(довести до конца)", key: true },
-        ],
-        quiz: {
-          type: "mc",
-          prompt: 'Что значит "to pull this off"?',
-          options: ["Снять одежду", "Успешно справиться", "Отъехать на машине", "Сдаться"],
-          answer: 1,
-          xp: 30,
-          explain: '"Pull off" — фразовый глагол: успешно сделать что-то трудное.',
-        },
-        hlsUrl: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        langCode: "en",
-        level: "a2",
-        createdAt: now - 4000,
-      },
-      {
-        id: "v2",
-        category: "Мем",
-        catEn: "MEME",
-        creatorName: "slanglord",
-        creatorHandle: "@slanglord",
-        creatorGradient: "brand",
-        creatorFollowers: "880K",
-        creatorVerified: true,
-        creatorMascot: false,
-        bgGradient: ["#0e3b2e", "#0a0f1e"],
-        caption: "POV: твой друг опять опаздывает 💀 #relatable",
-        likes: "342K",
-        comments: "9.1K",
-        shares: "44K",
-        tag: "#meme",
-        subtitle: [
-          { w: "He" },
-          { w: "is" },
-          { w: "always", t: "всегда" },
-          { w: "running", t: "бежит", key: true },
-          { w: "late", t: "опаздывает", key: true },
-          { w: "no" },
-          { w: "cap", t: "без вранья (сленг)", key: true },
-        ],
-        quiz: {
-          type: "fill",
-          prompt: "Заполни пропуск так, как сказал бы носитель:",
-          sentence: ["He is always", "___", "late, no cap"],
-          choices: ["running", "walking", "flying", "sleeping"],
-          answer: 0,
-          xp: 25,
-          explain: '"Running late" — устойчивое выражение «опаздывать».',
-        },
-        hlsUrl: "https://test-streams.mux.dev/pts_shift/master.m3u8",
-        langCode: "en",
-        level: "a2",
-        createdAt: now - 3000,
-      },
-      {
-        id: "v3",
-        category: "Уличный опрос",
-        catEn: "STREET",
-        creatorName: "NYC Talks",
-        creatorHandle: "@nyctalks",
-        creatorGradient: "reward",
-        creatorFollowers: "610K",
-        creatorVerified: false,
-        creatorMascot: false,
-        bgGradient: ["#5e3a12", "#1a1208"],
-        caption: "Спросили у прохожих в Нью-Йорке 🗽",
-        likes: "76K",
-        comments: "1.1K",
-        shares: "8K",
-        tag: "#street",
-        subtitle: [
-          { w: "Honestly", t: "честно говоря", key: true },
-          { w: "I" },
-          { w: "would" },
-          { w: "rather", t: "скорее бы", key: true },
-          { w: "grab", t: "схватить/взять", key: true },
-          { w: "a" },
-          { w: "coffee", t: "кофе" },
-        ],
-        quiz: {
-          type: "reorder",
-          prompt: "Собери фразу в правильном порядке:",
-          words: ["I", "would", "rather", "grab", "coffee"],
-          answer: ["I", "would", "rather", "grab", "coffee"],
-          xp: 35,
-          explain: '"Would rather" + глагол = «предпочёл бы».',
-        },
-        hlsUrl: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8",
-        langCode: "en",
-        level: "b1",
-        createdAt: now - 2000,
-      },
-      {
-        id: "v4",
-        category: "Мини-урок",
-        catEn: "LESSON",
-        creatorName: "Шарик",
-        creatorHandle: "@gav_official",
-        creatorGradient: "brand",
-        creatorFollowers: "3.4M",
-        creatorVerified: true,
-        creatorMascot: true,
-        bgGradient: ["#1c3a00", "#0a0f06"],
-        caption: "3 способа сказать «я устал» как носитель 🐶",
-        likes: "512K",
-        comments: "12K",
-        shares: "88K",
-        tag: "#lesson",
-        subtitle: [
-          { w: "I'm" },
-          { w: "absolutely", t: "абсолютно", key: true },
-          { w: "wiped", t: "вымотан (сленг)", key: true },
-          { w: "out", key: true },
-          { w: "today", t: "сегодня" },
-        ],
-        quiz: {
-          type: "meaning",
-          prompt: "Что имел в виду говорящий?",
-          options: ["Я очень устал", "Я промок", "Я заблудился", "Я проголодался"],
-          answer: 0,
-          xp: 30,
-          explain: '"Wiped out" — разговорное «полностью без сил».',
-        },
-        hlsUrl: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        langCode: "en",
-        level: "b1",
-        createdAt: now - 1000,
-      },
-    ])
+    .values(seedVideos)
     .onConflictDoNothing();
 
   await db
