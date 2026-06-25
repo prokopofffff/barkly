@@ -106,7 +106,13 @@ export default function FeedScreen() {
 
       {burst && <RewardBurst key={burst.id} data={burst} />}
 
-      {commentsFor && <CommentsSheet count={commentsFor.comments} onClose={() => setCommentsFor(null)} />}
+      {commentsFor && (
+        <CommentsSheet
+          videoId={commentsFor.id}
+          count={commentsFor.comments}
+          onClose={() => setCommentsFor(null)}
+        />
+      )}
 
       {showLinkNudge && <LinkAccountOverlay />}
     </View>

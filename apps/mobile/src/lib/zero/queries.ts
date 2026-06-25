@@ -40,6 +40,12 @@ export function useLeaderboardQuery(leagueId: string) {
   return z.query.leagueMember.where('leagueId', '=', leagueId).orderBy('xp', 'desc');
 }
 
+/** A league's display name + season countdown (public — everyone sees it). */
+export function useLeagueQuery(leagueId: string) {
+  const z = useZero();
+  return z.query.league.where('id', '=', leagueId).one();
+}
+
 /** A user's achievements in display order. */
 export function useAchievementsQuery(userID: string) {
   const z = useZero();
@@ -56,6 +62,12 @@ export function useCosmeticsQuery(userID: string) {
 export function useNotificationsQuery(userID: string) {
   const z = useZero();
   return z.query.notification.where('userID', '=', userID).orderBy('createdAt', 'desc');
+}
+
+/** A clip's in-app comments, newest first (public — everyone sees them). */
+export function useVideoCommentsQuery(videoID: string) {
+  const z = useZero();
+  return z.query.comment.where('videoID', '=', videoID).orderBy('createdAt', 'desc');
 }
 
 /** A user's per-video progress (watch + quiz results). */

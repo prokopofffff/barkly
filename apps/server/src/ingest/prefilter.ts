@@ -132,10 +132,19 @@ export type PrefilterOptions = {
 
 
 function statsOf(meta: VideoMeta) {
-  const s: { views?: number; likes?: number; comments?: number } = {};
+  const s: {
+    views?: number;
+    likes?: number;
+    comments?: number;
+    channelFollowers?: number;
+    channelVerified?: boolean;
+  } = {};
   if (meta.views != null) s.views = meta.views;
   if (meta.likes != null) s.likes = meta.likes;
   if (meta.comments != null) s.comments = meta.comments;
+  // Channel attribution for the promoted video's creator profile (cj6.3).
+  if (meta.channelFollowers != null) s.channelFollowers = meta.channelFollowers;
+  if (meta.channelVerified) s.channelVerified = true;
   return s;
 }
 

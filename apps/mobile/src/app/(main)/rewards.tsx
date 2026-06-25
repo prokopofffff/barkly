@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useQuery } from '@rocicorp/zero/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
@@ -19,8 +20,10 @@ import { Sharik } from '@/components/mascot';
 import { PrimaryButton } from '@/components/primary-button';
 import { SectionHead } from '@/components/section-head';
 import { COLORS } from '@/constants/gav';
-import { COSMETICS } from '@/lib/feed/app-data';
+import { useAuth } from '@/lib/auth/auth-context';
+import { COSMETICS, type Cosmetic } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
+import { useCosmeticsQuery } from '@/lib/zero/queries';
 
 /** The prize the daily chest always rewards in the prototype. */
 type Loot = { name: string; rarity: string; id: string; color: string; gems: number };
@@ -36,9 +39,28 @@ type Reveal = null | 'shaking' | Loot;
  */
 export default function RewardsScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { state, cosmetic, setCosmetic } = useGame();
   const [reveal, setReveal] = useState<Reveal>(null);
   const [chestReady, setChestReady] = useState(true);
+
+  // Cosmetics catalog + ownership from Zero; falls back to the bundled
+  // COSMETICS constant while the local replica is empty (no backend yet).
+  const [cosmeticRows] = useQuery(useCosmeticsQuery(user?.userID ?? ''));
+  const cosmetics = useMemo<Cosmetic[]>(
+    () =>
+      cosmeticRows.length === 0
+        ? COSMETICS
+        : cosmeticRows.map((c) => ({
+            id: c.id as Cosmetic['id'],
+            name: c.name,
+            rarity: c.rarity,
+            cost: c.cost ?? 0,
+            owned: c.owned ?? false,
+            color: c.color,
+          })),
+    [cosmeticRows],
+  );
 
   const openChest = () => {
     if (!chestReady) return;
@@ -138,7 +160,7 @@ export default function RewardsScreen() {
               preview={<Sharik mood="idle" size={64} />}
               onPress={() => setCosmetic(null)}
             />
-            {COSMETICS.map((c) => (
+            {cosmetics.map((c) => (
               <CosmeticCard
                 key={c.id}
                 active={cosmetic === c.id}

@@ -78,7 +78,16 @@ export const ingestVideo = pgTable("ingest_video", {
   isShort: boolean("is_short").notNull().default(false),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   stats: jsonb("stats")
-    .$type<{ views?: number; likes?: number; comments?: number }>()
+    .$type<{
+      views?: number;
+      likes?: number;
+      comments?: number;
+      // Channel attribution captured from full video metadata (yt-dlp), used to
+      // populate the creator profile on the promoted `video` row. Absent when
+      // YouTube doesn't surface the follower count.
+      channelFollowers?: number;
+      channelVerified?: boolean;
+    }>()
     .notNull()
     .default({}),
 

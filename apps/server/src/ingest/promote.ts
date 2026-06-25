@@ -54,11 +54,21 @@ export function pickBgGradient(seed: string): readonly [string, string] {
   return BG_GRADIENTS[hash(seed) % BG_GRADIENTS.length]!;
 }
 
-/** Human-friendly count: 1234 -> "1.2K", 2_500_000 -> "2.5M". */
+/**
+ * Compact YouTube-style count label: 988 -> "988", 342_000 -> "342K",
+ * 1234 -> "1.2K", 1_200_000 -> "1.2M". One decimal in the K/M ranges, but a
+ * trailing ".0" is dropped so round numbers read "128K" / "2M" rather than
+ * "128.0K" / "2.0M".
+ */
 export function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000_000) return `${trim1(n / 1_000_000)}M`;
+  if (n >= 1_000) return `${trim1(n / 1_000)}K`;
   return String(n);
+}
+
+/** One decimal place, dropping a redundant ".0" (5 -> "5", 1.2 -> "1.2"). */
+function trim1(x: number): string {
+  return x.toFixed(1).replace(/\.0$/, "");
 }
 
 function handleFrom(seed: string, channelHandle: string | null): string {
@@ -93,6 +103,7 @@ export async function runPromote(opts: {
       subtitle: videoLesson.subtitle,
       quiz: videoLesson.quiz,
       prior: videoDifficulty.priorDifficulty,
+      stats: ingestVideo.stats,
     })
     .from(ingestVideo)
     .innerJoin(ingestChannel, eq(ingestChannel.id, ingestVideo.channelId))
@@ -110,6 +121,8 @@ export async function runPromote(opts: {
     try {
       if (!row.quiz) throw new Error("no quiz on lesson");
       const labels = topicLabels(row.topic);
+      const stats = row.stats ?? {};
+      const followers = stats.channelFollowers;
 
       const videoRow = {
         id: row.id,
@@ -118,16 +131,19 @@ export async function runPromote(opts: {
         creatorName: row.channelName,
         creatorHandle: handleFrom(row.channelName, row.channelHandle),
         creatorGradient: pickGradient(row.id),
-        creatorFollowers: "",
-        creatorVerified: false,
+        // Real YouTube channel attribution when available; empty/false otherwise
+        // (follower count is hidden on some channels).
+        creatorFollowers: followers != null ? formatCount(followers) : "",
+        creatorVerified: stats.channelVerified ?? false,
         creatorMascot: false,
         bgGradient: pickBgGradient(row.id) as readonly [string, string],
         caption: row.captionRu,
-        // Engagement counts come from OUR platform (the like/comment/repost
-        // tables), not YouTube — seed them at zero so real activity takes over.
-        likes: "0",
-        comments: "0",
-        shares: "0",
+        // Real YouTube engagement counts from the clip's metadata, formatted as
+        // compact labels. YouTube has no share count, so shares stays empty and
+        // the feed omits the number.
+        likes: formatCount(stats.likes ?? 0),
+        comments: formatCount(stats.comments ?? 0),
+        shares: "",
         tag: `#${row.topic}`,
         subtitle: row.subtitle as readonly SubtitleToken[],
         quiz: row.quiz as Quiz,

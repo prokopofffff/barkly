@@ -28,6 +28,8 @@ async function seed() {
       xpToNext: 3200,
       gems: 1240,
       streak: 47,
+      friendshipLevel: 8,
+      wordsLearned: 312,
       league: "Изумрудная",
       leagueRank: 3,
       mascotCosmetic: "cap",
@@ -66,6 +68,13 @@ async function seed() {
     .onConflictDoNothing();
 
   await db
+    .insert(s.league)
+    .values([
+      { id: "emerald", name: "Изумрудная лига", daysLeft: 3 },
+    ])
+    .onConflictDoNothing();
+
+  await db
     .insert(s.achievement)
     .values([
       { id: `${U}:streak50`, userID: U, icon: "fire", name: "Стрик 50", description: "50 дней подряд", done: false, color: "#ff8a3d", pct: 94, sort: 0 },
@@ -78,11 +87,11 @@ async function seed() {
   await db
     .insert(s.notification)
     .values([
-      { id: `${U}:n1`, userID: U, kind: "streak", title: "Шарик скучает! 🐶", text: "Не теряй стрик 47 дней — пройди один урок сегодня.", time: "сейчас", accent: "#ff8a3d", read: false, createdAt: now - 100 },
-      { id: `${U}:n2`, userID: U, kind: "friend", title: "Sofia обогнала тебя!", text: "Она набрала 3 890 XP. Догонишь?", time: "12 мин", accent: "#c084fc", read: false, createdAt: now - 200 },
-      { id: `${U}:n3`, userID: U, kind: "xp", title: "Новый уровень — 12! ⚡", text: "Ты теперь «Болтун». Открыт новый скин.", time: "1 ч", accent: "#ffd83d", read: false, createdAt: now - 300 },
-      { id: `${U}:n4`, userID: U, kind: "reward", title: "Сундук готов открыться", text: "Заработай 100 XP, чтобы получить награду.", time: "3 ч", accent: "#b6f23d", read: false, createdAt: now - 400 },
-      { id: `${U}:n5`, userID: U, kind: "friend", title: "kirill_92 теперь твой друг", text: "Соревнуйтесь в недельной лиге!", time: "вчера", accent: "#34e3ff", read: false, createdAt: now - 500 },
+      { id: `${U}:n1`, userID: U, kind: "streak", title: "Шарик скучает! 🐶", text: "Не теряй стрик 47 дней — пройди один урок сегодня.", time: "сейчас", accent: "#ff8a3d", read: false, createdAt: now - 5_000 },
+      { id: `${U}:n2`, userID: U, kind: "friend", title: "Sofia обогнала тебя!", text: "Она набрала 3 890 XP. Догонишь?", time: "12 мин", accent: "#c084fc", read: false, createdAt: now - 12 * 60_000 },
+      { id: `${U}:n3`, userID: U, kind: "xp", title: "Новый уровень — 12! ⚡", text: "Ты теперь «Болтун». Открыт новый скин.", time: "1 ч", accent: "#ffd83d", read: false, createdAt: now - 60 * 60_000 },
+      { id: `${U}:n4`, userID: U, kind: "reward", title: "Сундук готов открыться", text: "Заработай 100 XP, чтобы получить награду.", time: "3 ч", accent: "#b6f23d", read: false, createdAt: now - 3 * 60 * 60_000 },
+      { id: `${U}:n5`, userID: U, kind: "friend", title: "kirill_92 теперь твой друг", text: "Соревнуйтесь в недельной лиге!", time: "вчера", accent: "#34e3ff", read: false, createdAt: now - 24 * 60 * 60_000 },
     ])
     .onConflictDoNothing();
 

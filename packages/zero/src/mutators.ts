@@ -1,6 +1,7 @@
 import type { CustomMutatorDefs, Transaction } from '@rocicorp/zero';
 
 import type { Schema } from './schema';
+import type { GradientName } from './types';
 
 /**
  * Zero custom mutators — the ONLY write path (reads via queries, writes via
@@ -79,6 +80,28 @@ export function createMutators() {
       } else {
         await tx.mutate.like.delete({ id });
       }
+    },
+
+    /**
+     * Post an in-app comment on a clip. App-native (NOT from YouTube). The id is
+     * a composite key so the same body is idempotent across client + server, and
+     * `likes` starts at 0. `name`/`gradient` are denormalised from the author so
+     * the sheet renders an avatar without a join.
+     */
+    async postComment(
+      tx: Tx,
+      a: { id: string; videoID: string; userID: string; name: string; gradient: GradientName; text: string },
+    ) {
+      await tx.mutate.comment.insert({
+        id: a.id,
+        videoID: a.videoID,
+        userID: a.userID,
+        name: a.name,
+        gradient: a.gradient,
+        text: a.text,
+        likes: 0,
+        createdAt: Date.now(),
+      });
     },
 
     /** Follow a creator. */

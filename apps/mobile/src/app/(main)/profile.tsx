@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -14,11 +15,11 @@ import { SectionHead } from '@/components/section-head';
 import { XPBar } from '@/components/xp-bar';
 import { COLORS, GRADIENTS } from '@/constants/gav';
 import { useAuth } from '@/lib/auth/auth-context';
-import { ACHIEVEMENTS, USER } from '@/lib/feed/app-data';
+import { ACHIEVEMENTS, USER, type Achievement } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
 import { useLocalProfile } from '@/lib/profile/local-profile';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
-import { useCurrentUserQuery } from '@/lib/zero/queries';
+import { useAchievementsQuery, useCurrentUserQuery } from '@/lib/zero/queries';
 
 const WEEK = [40, 70, 30, 90, 55, 100, 65];
 const DAYS = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
@@ -35,7 +36,46 @@ export default function ProfileScreen() {
   const { user } = useAuth();
   const { linkPromptDismissed } = useLocalProfile();
   const [me] = useQuery(useCurrentUserQuery(user?.userID ?? ''));
+  const [achievementRows] = useQuery(useAchievementsQuery(user?.userID ?? ''));
   const isCurator = me?.role === 'curator' || me?.role === 'admin';
+
+  // cj6.8: drive the header/stats from the user row, falling back to the USER
+  // demo constant while the local replica is empty (no backend yet).
+  const profile = useMemo(
+    () =>
+      me
+        ? {
+            name: me.name,
+            handle: me.handle,
+            level: me.level ?? USER.level,
+            levelName: me.levelName,
+            xpToNext: me.xpToNext ?? USER.xpToNext,
+            totalXp: me.xp ?? USER.totalXp,
+            league: me.league,
+            leagueRank: me.leagueRank ?? USER.leagueRank,
+            friendshipLevel: me.friendshipLevel ?? USER.friendshipLevel,
+            wordsLearned: me.wordsLearned ?? USER.wordsLearned,
+          }
+        : USER,
+    [me],
+  );
+
+  // cj6.14: render achievements from Zero, mapping each row into the shape the
+  // achievements UI consumes; fall back to the demo list when empty.
+  const achievements = useMemo<Achievement[]>(
+    () =>
+      achievementRows.length === 0
+        ? ACHIEVEMENTS
+        : achievementRows.map((a) => ({
+            icon: a.icon as Achievement['icon'],
+            name: a.name,
+            desc: a.description,
+            done: a.done ?? false,
+            color: a.color,
+            pct: a.pct ?? undefined,
+          })),
+    [achievementRows],
+  );
 
   // Profile is the account hub: nudge an anonymous learner to secure progress.
   const showLinkCard = !!user?.isAnonymous && !linkPromptDismissed;
@@ -59,15 +99,15 @@ export default function ProfileScreen() {
         </View>
 
         <View className="flex-row items-center gap-4">
-          <ProgressRing pct={(state.xp / USER.xpToNext) * 100} size={92} stroke={7} color={COLORS.violet}>
-            <Avatar name={USER.name} size={70} gradient="fun" ring={false} />
+          <ProgressRing pct={(state.xp / profile.xpToNext) * 100} size={92} stroke={7} color={COLORS.violet}>
+            <Avatar name={profile.name} size={70} gradient="fun" ring={false} />
           </ProgressRing>
           <View className="flex-1">
             <Text className="font-nunito-black text-content" style={{ fontSize: 27 }}>
-              {USER.name}
+              {profile.name}
             </Text>
             <Text className="font-nunito-bold" style={{ color: COLORS.textDim, fontSize: 13 }}>
-              {USER.handle}
+              {profile.handle}
             </Text>
             <View className="mt-2 flex-row gap-2">
               <LinearGradient
@@ -78,7 +118,7 @@ export default function ProfileScreen() {
                 style={{ paddingVertical: 6, paddingHorizontal: 12 }}
               >
                 <Text className="font-nunito-x text-white" style={{ fontSize: 12 }}>
-                  Ур. {USER.level} · {USER.levelName}
+                  Ур. {profile.level} · {profile.levelName}
                 </Text>
               </LinearGradient>
             </View>
@@ -89,13 +129,13 @@ export default function ProfileScreen() {
         <View className="mt-4">
           <View className="mb-1.5 flex-row justify-between">
             <Text className="font-nunito-bold" style={{ color: COLORS.textDim, fontSize: 13 }}>
-              До уровня {USER.level + 1}
+              До уровня {profile.level + 1}
             </Text>
             <Text className="font-nunito-bold" style={{ color: COLORS.gold, fontSize: 13 }}>
-              {state.xp} / {USER.xpToNext} XP
+              {state.xp} / {profile.xpToNext} XP
             </Text>
           </View>
-          <XPBar value={state.xp} max={USER.xpToNext} height={10} />
+          <XPBar value={state.xp} max={profile.xpToNext} height={10} />
         </View>
       </LinearGradient>
 
@@ -109,9 +149,9 @@ export default function ProfileScreen() {
       {/* stats grid */}
       <View className="flex-row flex-wrap gap-3" style={{ paddingHorizontal: 22, paddingVertical: 4 }}>
         <Stat icon="fire" color={COLORS.flame} value={String(state.streak)} label="дней стрик" />
-        <Stat icon="bolt" color={COLORS.gold} value={USER.totalXp.toLocaleString('ru-RU')} label="всего XP" />
-        <Stat icon="sparkle" color={COLORS.violet} value={String(USER.wordsLearned)} label="слов выучено" />
-        <Stat icon="trophy" color={COLORS.cyan} value={'#' + USER.leagueRank} label={USER.league + ' лига'} />
+        <Stat icon="bolt" color={COLORS.gold} value={profile.totalXp.toLocaleString('ru-RU')} label="всего XP" />
+        <Stat icon="sparkle" color={COLORS.violet} value={String(profile.wordsLearned)} label="слов выучено" />
+        <Stat icon="trophy" color={COLORS.cyan} value={'#' + profile.leagueRank} label={profile.league + ' лига'} />
       </View>
 
       {/* mascot showcase */}
@@ -132,7 +172,7 @@ export default function ProfileScreen() {
               Твой Шарик
             </Text>
             <Text className="font-nunito-x text-content" style={{ fontSize: 21, marginVertical: 2, marginBottom: 10 }}>
-              Уровень дружбы {USER.friendshipLevel}
+              Уровень дружбы {profile.friendshipLevel}
             </Text>
             <Pressable
               onPress={() => router.push('/rewards')}
@@ -239,7 +279,7 @@ export default function ProfileScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 4, gap: 12 }}
         >
-          {ACHIEVEMENTS.map((a) => (
+          {achievements.map((a) => (
             <View
               key={a.name}
               className="items-center rounded-[20px]"

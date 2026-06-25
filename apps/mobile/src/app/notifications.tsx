@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -10,13 +10,48 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import { useQuery } from '@rocicorp/zero/react';
+import type { Notification } from '@barkly/zero';
 
 import { Icon } from '@/components/icon';
 import { IconButton } from '@/components/icon-button';
 import { Sharik } from '@/components/mascot';
 import { COLORS } from '@/constants/gav';
+import { useAuth } from '@/lib/auth/auth-context';
 import { NOTIFICATION_ICON, NOTIFICATIONS } from '@/lib/feed/app-data';
 import type { AppNotification } from '@/lib/feed/app-data';
+import { useNotificationsQuery } from '@/lib/zero/queries';
+
+/**
+ * A short Russian "time ago" label derived from a notification's real
+ * `createdAt` (ms epoch). Mirrors the seed's offsets: «сейчас» / «12 мин» /
+ * «1 ч» / «вчера». Falls back to the row's stored `time` string for stale or
+ * future timestamps.
+ */
+function relativeTime(createdAt: number, fallback: string): string {
+  const sec = Math.round((Date.now() - createdAt) / 1000);
+  if (sec < 0) return fallback || 'сейчас';
+  if (sec < 45) return 'сейчас';
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min} мин`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} ч`;
+  const day = Math.round(hr / 24);
+  if (day === 1) return 'вчера';
+  if (day < 7) return `${day} дн`;
+  return fallback || `${day} дн`;
+}
+
+/** Map a generated Zero `notification` row to the screen's AppNotification shape. */
+function mapNotificationRow(n: Notification): AppNotification {
+  return {
+    kind: n.kind,
+    title: n.title,
+    text: n.text,
+    accent: n.accent,
+    time: relativeTime(n.createdAt, n.time),
+  };
+}
 
 /**
  * Notifications — a full-screen pushed route (no nav bar). Duolingo-style
@@ -25,6 +60,15 @@ import type { AppNotification } from '@/lib/feed/app-data';
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
+  // Read live from Zero; fall back to the bundled NOTIFICATIONS while the local
+  // replica is empty (no backend yet). Recompute only when the rows change.
+  const [rows] = useQuery(useNotificationsQuery(user?.userID ?? ''));
+  const notifications = useMemo(
+    () => (rows.length === 0 ? NOTIFICATIONS : rows.map(mapNotificationRow)),
+    [rows],
+  );
 
   return (
     <View className="flex-1 bg-bg">
@@ -75,7 +119,7 @@ export default function NotificationsScreen() {
             Сегодня
           </Text>
           <View className="gap-2.5">
-            {NOTIFICATIONS.map((n, i) => (
+            {notifications.map((n, i) => (
               <NotificationRow key={i} item={n} />
             ))}
           </View>

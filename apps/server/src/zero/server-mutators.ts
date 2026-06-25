@@ -56,6 +56,25 @@ export function createServerMutators(ctx: ServerCtx): CustomMutatorDefs<Tx> {
       await awardXp(tx, requireUser(), a.amount);
     },
 
+    // In-app comment. The author userID comes from the verified JWT, never the
+    // client args; the display name is read from the user row. gradient + text
+    // are cosmetic/content (no economy impact) so they're taken from the request,
+    // and the id is kept as-is for PushProcessor idempotency.
+    async postComment(tx, a) {
+      const userID = requireUser();
+      const u = await one(tx, 'SELECT name FROM "user" WHERE id = $1', [userID]);
+      await tx.mutate.comment.insert({
+        id: a.id,
+        videoID: a.videoID,
+        userID,
+        name: u ? String(u.name) : a.name,
+        gradient: a.gradient,
+        text: a.text,
+        likes: 0,
+        createdAt: Date.now(),
+      });
+    },
+
     // Seed the starting ELO from the onboarding self-assessment (authoritative;
     // identity from the JWT). `learningLevel` now carries the friendly key
     // (only_starting…fluent), not a CEFR letter.

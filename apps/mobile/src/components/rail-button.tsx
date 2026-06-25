@@ -16,9 +16,11 @@ export function RailButton({ icon, label, color, filled, onPress }: Props) {
   return (
     <Pressable onPress={onPress} className="items-center gap-1">
       <Icon name={icon} size={32} color={color} filled={filled} />
-      <Text className="font-nunito-x text-white" style={{ fontSize: 11 }}>
-        {label}
-      </Text>
+      {label ? (
+        <Text className="font-nunito-x text-white" style={{ fontSize: 11 }}>
+          {label}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
