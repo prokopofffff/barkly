@@ -1,10 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@rocicorp/zero/react';
 
 import type { SavedWord } from '@/components/feed-video';
 import { INITIAL_VOCABULARY, type VocabWord } from '@/lib/feed/app-data';
 import { INITIAL_USER_STATE, type FeedUserState } from '@/lib/feed/sample-videos';
 import { useAuth } from '@/lib/auth/auth-context';
 import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
+import { useCurrentUserQuery, useVocabularyQuery } from '@/lib/zero/queries';
 
 type GameContextValue = {
   state: FeedUserState;
@@ -45,6 +47,51 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<FeedUserState>({ ...INITIAL_USER_STATE });
   const [savedWords, setSavedWords] = useState<VocabWord[]>(INITIAL_VOCABULARY);
   const [cosmetic, setCosmeticState] = useState<string | null>('cap');
+
+  // Read-hydration from Zero (cj6.7 user counters/cosmetic, cj6.10 vocabulary).
+  // Reads sync reactively from the local replica; until a backend is configured
+  // the replica is empty, so we keep INITIAL_* as the fallback. The local state
+  // above is the optimistic layer that mutators write through — we only sync FROM
+  // Zero, never the other way (the mutators already persist writes).
+  const userID = user?.userID ?? '';
+  const [me] = useQuery(useCurrentUserQuery(userID));
+  const [vocabRows] = useQuery(useVocabularyQuery(userID));
+
+  // cj6.7: mirror the persisted user row into the optimistic counters + cosmetic
+  // whenever it changes. `combo` has no column, so it's client-only and left as-is.
+  useEffect(() => {
+    if (!me) return;
+    // Sync FROM the Zero replica (an external system) into the optimistic layer;
+    // the mutators own the write path, so this never loops. See use-color-scheme.web.ts
+    // for the same intentional external-sync escape hatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState((s) => ({
+      ...s,
+      xp: me.xp ?? s.xp,
+      xpToday: me.xpToday ?? s.xpToday,
+      streak: me.streak ?? s.streak,
+      gems: me.gems ?? s.gems,
+    }));
+    setCosmeticState(me.mascotCosmetic || null);
+  }, [me]);
+
+  // cj6.10: mirror the persisted vocabulary (newest first) into local state when
+  // the replica has rows; otherwise keep INITIAL_VOCABULARY as the fallback.
+  useEffect(() => {
+    if (vocabRows.length === 0) return;
+    // One-way sync from the Zero replica into the optimistic vocabulary list.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSavedWords(
+      vocabRows.map((w) => ({
+        en: w.en,
+        ru: w.ru,
+        type: w.type,
+        source: w.source,
+        example: w.example,
+        mastery: w.mastery ?? 0,
+      })),
+    );
+  }, [vocabRows]);
 
   const earn = useCallback(
     (amount: number, combo: number) => {

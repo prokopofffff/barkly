@@ -2,11 +2,19 @@ import { Fragment, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@rocicorp/zero/react';
 
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { COLORS, GRADIENTS } from '@/constants/gav';
 import { LEADERBOARD, type Player } from '@/lib/feed/app-data';
+import { useAuth } from '@/lib/auth/auth-context';
+import { useLeaderboardQuery, useLeagueQuery } from '@/lib/zero/queries';
+
+// The leagueId the standings/league rows are keyed by. The user row carries a
+// display name ("Изумрудная"), not a leagueId, so there's no clean mapping —
+// we default to the seed's "emerald" league (see apps/server/src/db/seed.ts).
+const DEFAULT_LEAGUE_ID = 'emerald';
 
 const MEDALS = ['🥉', '🥈', '🥇', '💎', '👑'];
 type Tab = 'league' | 'friends';
@@ -19,10 +27,32 @@ type Tab = 'league' | 'friends';
 export default function LeaderboardScreen() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('league');
-  const players = useMemo(
-    () => [...LEADERBOARD.players].sort((a, b) => b.xp - a.xp),
-    [],
+  const { user } = useAuth();
+  const userID = user?.userID ?? '';
+
+  // Standings (XP desc) + the league's name/countdown, both keyed by leagueId.
+  const [members] = useQuery(useLeaderboardQuery(DEFAULT_LEAGUE_ID));
+  const [league] = useQuery(useLeagueQuery(DEFAULT_LEAGUE_ID));
+
+  // Map league members to the row shape the UI consumes; mark the signed-in
+  // user's row as `me`. Already ordered by xp desc from the query. Fall back to
+  // the bundled LEADERBOARD constant while the local replica is empty.
+  const players = useMemo<Player[]>(
+    () =>
+      members.length === 0
+        ? [...LEADERBOARD.players].sort((a, b) => b.xp - a.xp)
+        : members.map((m) => ({
+            name: m.name,
+            xp: m.xp ?? 0,
+            gradient: m.gradient,
+            streak: m.streak ?? 0,
+            me: m.userID === userID,
+          })),
+    [members, userID],
   );
+
+  const leagueName = league?.name ?? LEADERBOARD.leagueName;
+  const daysLeft = league?.daysLeft ?? LEADERBOARD.daysLeft;
 
   return (
     <ScrollView
@@ -63,10 +93,10 @@ export default function LeaderboardScreen() {
           })}
         </View>
         <Text className="font-nunito-black text-content" style={{ fontSize: 27, letterSpacing: -0.5, textAlign: 'center' }}>
-          {LEADERBOARD.leagueName}
+          {leagueName}
         </Text>
         <Text className="font-nunito-bold" style={{ color: COLORS.textDim, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-          Топ-3 проходят выше · осталось {LEADERBOARD.daysLeft} дня
+          Топ-3 проходят выше · осталось {daysLeft} дня
         </Text>
       </View>
 

@@ -180,6 +180,11 @@ export type VideoMeta = {
   readonly views: number | null;
   readonly likes: number | null;
   readonly comments: number | null;
+  // Channel attribution for the creator profile on the promoted video row.
+  // yt-dlp's full single-video extraction exposes these; both can be null when
+  // YouTube doesn't surface them (e.g. follower count hidden by the channel).
+  readonly channelFollowers: number | null;
+  readonly channelVerified: boolean;
   readonly language: string | null; // yt-dlp's guess, when present
   readonly embeddable: boolean; // playable_in_embed — required for the embed feed
   readonly manualCaptionLangs: readonly string[]; // creator-uploaded captions
@@ -211,6 +216,10 @@ export function parseVideoMeta(json: string): VideoMeta {
     views: asNumber(r.view_count),
     likes: asNumber(r.like_count),
     comments: asNumber(r.comment_count),
+    channelFollowers: asNumber(r.channel_follower_count),
+    // yt-dlp only emits channel_is_verified when true; treat anything else as
+    // unverified.
+    channelVerified: r.channel_is_verified === true,
     language: asString(r.language),
     // Default to embeddable unless YouTube explicitly says otherwise.
     embeddable: r.playable_in_embed !== false,

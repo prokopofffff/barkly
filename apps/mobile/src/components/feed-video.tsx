@@ -195,6 +195,8 @@ export function FeedVideo({
         <RailButton icon="heart" label={item.likes} filled={liked} color={liked ? COLORS.rose : '#fff'} onPress={doLike} />
         <RailButton icon="comment" label={item.comments} color="#fff" onPress={onComments} />
         <RailButton icon="bookmark" label="Словарь" filled={saved} color={saved ? COLORS.gold : '#fff'} onPress={onOpenVocab} />
+        {/* YouTube has no share count, so item.shares is empty — render the
+            share button icon-only (RailButton omits an empty label). */}
         <RailButton icon="share" label={item.shares} color="#fff" onPress={() => {}} />
       </View>
 

@@ -16,10 +16,20 @@ describe("topicLabels", () => {
 });
 
 describe("formatCount", () => {
-  test("formats thousands and millions", () => {
+  test("raw number under 1000", () => {
+    expect(formatCount(0)).toBe("0");
+    expect(formatCount(988)).toBe("988");
     expect(formatCount(950)).toBe("950");
+  });
+  test("thousands, with a trimmed trailing .0", () => {
     expect(formatCount(1234)).toBe("1.2K");
+    expect(formatCount(342_000)).toBe("342K");
+    expect(formatCount(128_000)).toBe("128K");
+  });
+  test("millions, with a trimmed trailing .0", () => {
+    expect(formatCount(1_200_000)).toBe("1.2M");
     expect(formatCount(2_500_000)).toBe("2.5M");
+    expect(formatCount(2_000_000)).toBe("2M");
   });
 });
 

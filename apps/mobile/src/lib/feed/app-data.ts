@@ -101,15 +101,6 @@ export const NOTIFICATION_ICON: Record<AppNotification['kind'], IconName> = {
   reward: 'gift',
 };
 
-export type FeedComment = { name: string; text: string; likes: string; gradient: GradientName };
-
-export const FEED_COMMENTS: FeedComment[] = [
-  { name: 'kirill_92', text: 'омг наконец понял этот фразовый 🔥', likes: '1.2K', gradient: 'fun' },
-  { name: 'maria.eng', text: 'no cap это лучшее приложение', likes: '844', gradient: 'brand' },
-  { name: 'denis', text: 'стрик 60 дней, не могу остановиться 😭', likes: '510', gradient: 'reward' },
-  { name: 'lera_xx', text: 'кто ещё смотрит вместо тиктока', likes: '2.1K', gradient: 'fun' },
-];
-
 /** A saved word plus spaced-repetition mastery (0–3). */
 export type VocabWord = SavedWord & { mastery: number; isNew?: boolean };
 

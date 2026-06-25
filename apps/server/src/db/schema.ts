@@ -38,6 +38,8 @@ export const user = pgTable("user", {
   xpToNext: integer("xp_to_next").notNull().default(1000),
   gems: integer("gems").notNull().default(0),
   streak: integer("streak").notNull().default(0),
+  friendshipLevel: integer("friendship_level").notNull().default(0),
+  wordsLearned: integer("words_learned").notNull().default(0),
   league: text("league").notNull().default(""),
   leagueRank: integer("league_rank").notNull().default(0),
   mascotCosmetic: text("mascot_cosmetic").notNull().default(""),
@@ -99,6 +101,17 @@ export const leagueMember = pgTable("league_member", {
   streak: integer("streak").notNull().default(0),
 });
 
+// The league a member set belongs to (bd cj6.9). Public read — the leaderboard
+// shows everyone the league display name and the season countdown. `id` is the
+// leagueId referenced by leagueMember.leagueId (e.g. "emerald"). `daysLeft` is a
+// static season countdown — a deliberate simplification; a real season would
+// store an end timestamp and compute the remaining days client-side.
+export const league = pgTable("league", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  daysLeft: integer("days_left").notNull().default(0),
+});
+
 export const achievement = pgTable("achievement", {
   id: text("id").primaryKey(),
   userID: text("user_id").notNull(),
@@ -148,6 +161,21 @@ export const follow = pgTable("follow", {
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 
+// In-app comments on a clip (bd cj6.6). App-native and Zero-synced — NOT fetched
+// from YouTube. Public read (everyone viewing a video sees its comments); writes
+// go through the postComment mutator. `name`/`gradient` are denormalised from the
+// author's user row so the sheet can render an avatar without a join.
+export const comment = pgTable("comment", {
+  id: text("id").primaryKey(), // `${videoID}:${userID}:${createdAt}`
+  videoID: text("video_id").notNull(),
+  userID: text("user_id").notNull(),
+  name: text("name").notNull(),
+  gradient: text("gradient").$type<GradientName>().notNull(),
+  text: text("text").notNull(),
+  likes: integer("likes").notNull().default(0),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
 export const progress = pgTable("progress", {
   id: text("id").primaryKey(),
   userID: text("user_id").notNull(),
@@ -171,6 +199,9 @@ export const videoRelations = relations(video, ({ many }) => ({
   progress: many(progress),
   // "likes" the column is the count; the rows relation is named distinctly.
   likeRows: many(like),
+  // "comments" the column is the display-count text; the rows relation is
+  // named distinctly to avoid colliding with that column.
+  commentRows: many(comment),
 }));
 
 export const vocabularyRelations = relations(vocabulary, ({ one }) => ({
@@ -184,6 +215,11 @@ export const progressRelations = relations(progress, ({ one }) => ({
 
 export const likeRelations = relations(like, ({ one }) => ({
   video: one(video, { fields: [like.videoID], references: [video.id] }),
+}));
+
+export const commentRelations = relations(comment, ({ one }) => ({
+  video: one(video, { fields: [comment.videoID], references: [video.id] }),
+  user: one(user, { fields: [comment.userID], references: [user.id] }),
 }));
 
 export const achievementRelations = relations(achievement, ({ one }) => ({

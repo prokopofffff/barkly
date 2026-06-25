@@ -1,3 +1,4 @@
+import { useQuery } from '@rocicorp/zero/react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -5,17 +6,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { COLORS } from '@/constants/gav';
-import { FEED_COMMENTS } from '@/lib/feed/app-data';
+import { useVideoCommentsQuery } from '@/lib/zero/queries';
 
 type Props = {
+  /** The clip whose comments to show. */
+  videoId: string;
   /** Comment count label to show in the header. */
   count: string;
   onClose: () => void;
 };
 
 /** Slide-up comments sheet (66% tall) — design's `CommentsSheet`. */
-export function CommentsSheet({ count, onClose }: Props) {
+export function CommentsSheet({ videoId, count, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const [comments] = useQuery(useVideoCommentsQuery(videoId));
 
   return (
     <View className="absolute inset-0 z-50 justify-end">
@@ -36,8 +40,8 @@ export function CommentsSheet({ count, onClose }: Props) {
         </View>
 
         <ScrollView className="flex-1 px-[18px]">
-          {FEED_COMMENTS.map((c, i) => (
-            <View key={i} className="flex-row gap-3 py-3">
+          {comments.map((c) => (
+            <View key={c.id} className="flex-row gap-3 py-3">
               <Avatar name={c.name} size={40} gradient={c.gradient} ring={false} />
               <View className="flex-1">
                 <Text className="font-nunito-bold" style={{ color: COLORS.textDim, fontSize: 13 }}>

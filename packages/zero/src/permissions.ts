@@ -28,6 +28,9 @@ export const permissions = definePermissions<AuthData, Schema>(schema, () => {
     // Public reads.
     video: { row: { select: ANYONE_CAN } },
     leagueMember: { row: { select: ANYONE_CAN } },
+    league: { row: { select: ANYONE_CAN } },
+    // Comments are public — everyone viewing a video sees its comments.
+    comment: { row: { select: ANYONE_CAN } },
 
     // User-owned — only the authed user's own rows sync.
     user: { row: { select: [(auth, eb) => eb.cmp("id", "=", auth.sub)] } },
