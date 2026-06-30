@@ -75,3 +75,15 @@ export function useProgressForUser(userID: string) {
   const z = useZero();
   return z.query.progress.where('userID', '=', userID);
 }
+
+/** The clips a creator has published (their Studio "Опубликовано" list), newest first. */
+export function useCreatorVideosQuery(userID: string) {
+  const z = useZero();
+  return z.query.video.where('creatorId', '=', userID).orderBy('createdAt', 'desc');
+}
+
+/** A single clip's row — the editor reads its `subtitle` jsonb from here. */
+export function useVideoSubtitlesQuery(videoID: string) {
+  const z = useZero();
+  return z.query.video.where('id', '=', videoID).one();
+}

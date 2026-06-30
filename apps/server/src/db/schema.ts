@@ -60,6 +60,9 @@ export const video = pgTable("video", {
   creatorFollowers: text("creator_followers").notNull(),
   creatorVerified: boolean("creator_verified").notNull(),
   creatorMascot: boolean("creator_mascot").notNull().default(false),
+  // Owner of the clip when it was submitted by an app user (curator/creator).
+  // Nullable: existing seed/ingested rows have no owner. bk-cj6.17.
+  creatorId: text("creator_id").references(() => user.id),
   bgGradient: jsonb("bg_gradient").$type<readonly [string, string]>().notNull(),
   caption: text("caption").notNull(),
   likes: text("likes").notNull(),

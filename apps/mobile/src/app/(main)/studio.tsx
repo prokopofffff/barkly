@@ -1,3 +1,4 @@
+import { useQuery } from '@rocicorp/zero/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,12 +25,25 @@ import { Sharik } from '@/components/mascot';
 import { PrimaryButton } from '@/components/primary-button';
 import { SectionHead } from '@/components/section-head';
 import { COLORS, GRADIENTS } from '@/constants/gav';
+import { useAuth } from '@/lib/auth/auth-context';
 import { seeded } from '@/lib/feed/prng';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
+import { useCreatorVideosQuery, useVideoSubtitlesQuery } from '@/lib/zero/queries';
 
 type QuizType = 'mc' | 'fill' | 'reorder' | 'meaning';
 type Marker = { pos: number; type: QuizType };
-type Sub = { t: string; text: string };
+/** One subtitle token rendered in the editor: the word, its translation
+ * (when present), and whether it's a highlighted key vocabulary word. */
+type Sub = { w: string; t?: string; key?: boolean };
+
+/** Placeholder subtitle tokens shown until a real video's `subtitle` jsonb loads. */
+const PLACEHOLDER_SUBS: Sub[] = [
+  { w: 'pull', t: 'тянуть', key: true },
+  { w: 'off', key: true },
+  { w: 'that', t: 'это' },
+  { w: 'was', t: 'было' },
+  { w: 'insane', t: 'безумно', key: true },
+];
 
 const TYPE_COLOR: Record<QuizType, string> = {
   mc: COLORS.lime,
@@ -55,6 +69,7 @@ type Studio = 'home' | 'editor' | 'stats';
  */
 export default function StudioScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [view, setView] = useState<Studio>('home');
   const [markers, setMarkers] = useState<Marker[]>([
     { pos: 32, type: 'mc' },
@@ -63,11 +78,11 @@ export default function StudioScreen() {
   const [playhead, setPlayhead] = useState(45);
   const [aiBusy, setAiBusy] = useState(false);
   const aiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const subs: Sub[] = [
-    { t: '0:02', text: "I can't believe you pulled this off" },
-    { t: '0:05', text: 'That was absolutely insane' },
-    { t: '0:08', text: 'We should do it again sometime' },
-  ];
+
+  // The editor previews the creator's first owned video's subtitles, when any
+  // exist; otherwise the editor falls back to placeholder subs.
+  const [ownVideos] = useQuery(useCreatorVideosQuery(user?.userID ?? ''));
+  const editorVideoId = ownVideos[0]?.id;
 
   useEffect(() => () => {
     if (aiTimer.current) clearTimeout(aiTimer.current);
@@ -140,7 +155,7 @@ export default function StudioScreen() {
             onTrackPress={setPlayhead}
             onAddMarker={addMarker}
             onGenAI={genAI}
-            subs={subs}
+            videoId={editorVideoId}
           />
         )}
       </ScrollView>
@@ -149,12 +164,31 @@ export default function StudioScreen() {
 }
 
 /* ----------------------- Мои видео (hub) ----------------------- */
+type StudioVideo = { title: string; grad: readonly [string, string]; views: string; done: string; quizzes: number };
+
+// Placeholder list shown before the creator has any published clips in the
+// replica (same spirit as the feed's SAMPLE_VIDEOS fallback) — never blank.
+const SAMPLE_MINE: StudioVideo[] = [
+  { title: 'Фразовые глаголы: pull off', grad: SAMPLE_VIDEOS[0].bgGradient, views: '42K', done: '78%', quizzes: 3 },
+  { title: '3 способа сказать «я устал»', grad: SAMPLE_VIDEOS[3].bgGradient, views: '128K', done: '85%', quizzes: 2 },
+  { title: 'Сленг: no cap, fr fr', grad: SAMPLE_VIDEOS[1].bgGradient, views: '9.4K', done: '61%', quizzes: 1 },
+];
+
 function MyVideosHome({ onEditor, onStats }: { onEditor: () => void; onStats: () => void }) {
-  const mine = [
-    { title: 'Фразовые глаголы: pull off', grad: SAMPLE_VIDEOS[0].bgGradient, views: '42K', done: '78%', quizzes: 3 },
-    { title: '3 способа сказать «я устал»', grad: SAMPLE_VIDEOS[3].bgGradient, views: '128K', done: '85%', quizzes: 2 },
-    { title: 'Сленг: no cap, fr fr', grad: SAMPLE_VIDEOS[1].bgGradient, views: '9.4K', done: '61%', quizzes: 1 },
-  ];
+  const { user } = useAuth();
+  const [rows] = useQuery(useCreatorVideosQuery(user?.userID ?? ''));
+  // `views` is an engagement stand-in (row.likes) — real views/completion are
+  // DEFERRED to bk-cj6.24; `done` is left blank until then. One quiz jsonb per row.
+  const mine: StudioVideo[] =
+    rows.length === 0
+      ? SAMPLE_MINE
+      : rows.map((v) => ({
+          title: v.caption || v.catEn,
+          grad: [v.bgGradient[0], v.bgGradient[1]] as const,
+          views: v.likes,
+          done: '—',
+          quizzes: 1,
+        }));
 
   return (
     <View style={{ paddingHorizontal: 22 }}>
@@ -188,7 +222,7 @@ function MyVideosHome({ onEditor, onStats }: { onEditor: () => void; onStats: ()
         </Pressable>
       </View>
 
-      <SectionHead title="Опубликовано" action="3 видео" />
+      <SectionHead title="Опубликовано" action={`${mine.length} видео`} />
       <View className="gap-2.5">
         {mine.map((m, i) => (
           <Pressable
@@ -244,7 +278,7 @@ function Editor({
   onTrackPress,
   onAddMarker,
   onGenAI,
-  subs,
+  videoId,
 }: {
   markers: Marker[];
   playhead: number;
@@ -252,9 +286,18 @@ function Editor({
   onTrackPress: (pos: number) => void;
   onAddMarker: () => void;
   onGenAI: () => void;
-  subs: Sub[];
+  videoId?: string;
 }) {
   const trackW = useRef(0);
+
+  // The subtitle list comes from the selected video's `subtitle` jsonb (flat
+  // SubtitleToken[] — no timecodes). Falls back to placeholders when there's no
+  // video selected or the row carries no tokens.
+  const [video] = useQuery(useVideoSubtitlesQuery(videoId ?? ''));
+  const subs: Sub[] =
+    video && video.subtitle.length > 0
+      ? video.subtitle.map((tok) => ({ w: tok.w, t: tok.t, key: tok.key }))
+      : PLACEHOLDER_SUBS;
 
   const onTrackLayout = (e: LayoutChangeEvent) => {
     trackW.current = e.nativeEvent.layout.width;
@@ -412,12 +455,23 @@ function Editor({
               className="flex-row items-center gap-2.5 rounded-[12px] bg-surface-2"
               style={{ paddingVertical: 10, paddingHorizontal: 12 }}
             >
-              <Text className="font-mono" style={{ fontSize: 11, color: COLORS.lime }}>
-                {s.t}
+              <Text className="font-mono" style={{ fontSize: 11, color: COLORS.textFaint }}>
+                {i + 1}
               </Text>
-              <Text className="flex-1 font-nunito-bold text-content" style={{ fontSize: 13 }}>
-                {s.text}
+              <Text
+                className="font-nunito-x"
+                style={{ fontSize: 13, color: s.key ? COLORS.lime : COLORS.text }}
+              >
+                {s.w}
               </Text>
+              {s.t ? (
+                <Text className="flex-1 font-nunito-bold text-content-dim" style={{ fontSize: 13 }}>
+                  {s.t}
+                </Text>
+              ) : (
+                <View className="flex-1" />
+              )}
+              {s.key && <Icon name="sparkle" size={12} color={COLORS.lime} />}
               <Icon name="edit" size={16} color={COLORS.textFaint} />
             </View>
           ))}

@@ -32,9 +32,13 @@ export function QuizSheet({ quiz, onClose, onResult }: Props) {
   const [correct, setCorrect] = useState(false);
   const [sel, setSel] = useState<number | null>(null); // mc / meaning / fill
   const [order, setOrder] = useState<string[]>([]); // reorder
+  // Fresh per-mount seed (computed once at mount, never during render) so the
+  // word bank order differs per player and per replay instead of being a
+  // deterministic function of quiz metadata.
+  const [shuffleSeed] = useState(() => Date.now());
   const initialBank = useMemo(
-    () => (quiz.type === 'reorder' ? seededShuffle(quiz.words, quiz.prompt.length + quiz.xp) : []),
-    [quiz],
+    () => (quiz.type === 'reorder' ? seededShuffle(quiz.words, shuffleSeed) : []),
+    [quiz, shuffleSeed],
   );
   const [bank, setBank] = useState<string[]>(initialBank);
 

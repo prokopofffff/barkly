@@ -40,7 +40,7 @@ async function seed() {
 
   await db
     .insert(s.video)
-    .values(seedVideos)
+    .values(seedVideos.map((v, i) => (i < 3 ? { ...v, creatorId: U } : v)))
     .onConflictDoNothing();
 
   await db
