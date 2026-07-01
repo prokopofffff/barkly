@@ -23,11 +23,28 @@ import { COLORS } from '@/constants/gav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { COSMETICS, type Cosmetic } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
+import { seeded } from '@/lib/feed/prng';
 import { useCosmeticsQuery } from '@/lib/zero/queries';
 
-/** The prize the daily chest always rewards in the prototype. */
+/** The prize the daily chest rewards. INTERIM (bk-cj6.13): rolled client-side. */
 type Loot = { name: string; rarity: string; id: string; color: string; gems: number };
-const CHEST_LOOT: Loot = { name: 'Шарф «Неон»', rarity: 'Редкое', id: 'scarf', color: COLORS.cyan, gems: 120 };
+
+/** Fallback loot used only when the cosmetics catalog is somehow empty. */
+const FALLBACK_LOOT: Loot = { name: 'Шарф «Неон»', rarity: 'Редкое', id: 'scarf', color: COLORS.cyan, gems: 120 };
+
+/** How likely each rarity is to be rolled from the daily chest. */
+const RARITY_WEIGHT: Record<string, number> = { Обычное: 6, Редкое: 3, Легендарное: 1 };
+/** Gems awarded per rarity tier (crediting itself is deferred to bk-cj6.27). */
+const RARITY_GEMS: Record<string, number> = { Обычное: 60, Редкое: 120, Легендарное: 300 };
+
+/** djb2-style string hash → positive 32-bit int, used to seed the daily roll. */
+function hashString(str: string): number {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 33) ^ str.charCodeAt(i);
+  }
+  return h >>> 0;
+}
 
 /** null = closed, 'shaking' = opening animation, Loot = the reveal. */
 type Reveal = null | 'shaking' | Loot;
@@ -62,16 +79,57 @@ export default function RewardsScreen() {
     [cosmeticRows],
   );
 
+  // Stable calendar day captured ONCE per mount so render stays pure (no
+  // non-deterministic Date read during render/useMemo bodies).
+  const dayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Deterministic per-(user, day) seed: same user + same day → same loot.
+  const seed = useMemo(
+    () => hashString(`${user?.userID ?? 'anon'}:${dayKey}`),
+    [user?.userID, dayKey],
+  );
+
+  // INTERIM daily roll (bk-cj6.13): rarity-weighted pick from the catalog,
+  // preferring not-yet-owned cosmetics. All randomness comes from the seeded
+  // PRNG, so this useMemo is pure and stable within a day. Server-authoritative
+  // rolling + gem crediting is deferred to bk-cj6.27.
+  const dailyLoot = useMemo<Loot>(() => {
+    const pool = cosmetics.filter((c) => c.owned === false);
+    const candidates = pool.length > 0 ? pool : cosmetics;
+    if (candidates.length === 0) return FALLBACK_LOOT;
+
+    const rng = seeded(seed);
+    const weights = candidates.map((c) => RARITY_WEIGHT[c.rarity] ?? 3);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let roll = rng() * total;
+    let chosen = candidates[candidates.length - 1];
+    for (let i = 0; i < candidates.length; i++) {
+      roll -= weights[i];
+      if (roll < 0) {
+        chosen = candidates[i];
+        break;
+      }
+    }
+
+    return {
+      name: chosen.name,
+      rarity: chosen.rarity,
+      id: chosen.id,
+      color: chosen.color,
+      gems: RARITY_GEMS[chosen.rarity] ?? 120,
+    };
+  }, [cosmetics, seed]);
+
   const openChest = () => {
     if (!chestReady) return;
     setReveal('shaking');
-    setTimeout(() => setReveal(CHEST_LOOT), 900);
+    setTimeout(() => setReveal(dailyLoot), 900);
   };
 
   const claim = () => {
     setReveal(null);
     setChestReady(false);
-    setCosmetic('scarf');
+    setCosmetic(dailyLoot.id as Cosmetic['id']);
   };
 
   return (
