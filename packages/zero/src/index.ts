@@ -6,3 +6,4 @@ export * from './schema';
 export * from './mutators';
 export * from './permissions';
 export * from './elo';
+export * from './policy';

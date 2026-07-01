@@ -19,6 +19,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { GameProvider } from '@/lib/feed/game-context';
 import { LocalProfileProvider, useLocalProfile } from '@/lib/profile/local-profile';
+import { ProfileSync } from '@/lib/profile/profile-sync';
 import { AppZeroProvider } from '@/lib/zero/provider';
 
 export default function RootLayout() {
@@ -41,6 +42,10 @@ export default function RootLayout() {
         <AuthProvider>
           <LocalProfileProvider>
             <AppZeroProvider>
+              {/* Headless — reconciles the synced Zero user/progress rows back
+                  into the device-local profile. Inside AppZeroProvider so it has
+                  Zero context; inside Auth/LocalProfile so it has user + cache. */}
+              <ProfileSync />
               <GameProvider>
                 <ThemeProvider value={DarkTheme}>
                   <OnboardingGate>
