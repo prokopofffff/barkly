@@ -55,3 +55,76 @@ export function aggregateByVideo(
   }
   return out;
 }
+
+// --- watch analytics: retention + engagement curves --------------------------
+
+// One recorded watch event. `posPct` is 0-100 position within the clip; `kind`
+// distinguishes how far a viewer reached ("reach") from active interactions
+// ("replay" scrub-backs / "answer" quiz answers) that feed the engagement heat.
+export type WatchEventRow = {
+  userID: string;
+  videoID: string;
+  posPct: number;
+  kind: "reach" | "replay" | "answer";
+};
+
+/**
+ * Materialize per-video retention + engagement curves from raw watch events.
+ * Events are grouped by videoID, then for each video:
+ *  - retention[b] (length `buckets`) = round(100 * distinctViewers whose MAX
+ *    posPct >= threshold(b) / distinctViewers), threshold(b) = ((b+1)/buckets)*100.
+ *    A viewer is anyone who produced any event. No viewers -> all zeros. The
+ *    curve is monotonically non-increasing and starts at 100.
+ *  - engagement (length `cells`) = count of replay/answer events binned by
+ *    posPct into `cells` bins, then divided by the max bin count so the hottest
+ *    cell is 1 (all zeros if there are no such events). Deterministic.
+ */
+export function materializeVideoAnalytics(
+  events: readonly WatchEventRow[],
+  buckets = 10,
+  cells = 35,
+): Map<string, { retention: number[]; engagement: number[] }> {
+  const byVideo = new Map<string, WatchEventRow[]>();
+  for (const e of events) {
+    const group = byVideo.get(e.videoID);
+    if (group) group.push(e);
+    else byVideo.set(e.videoID, [e]);
+  }
+
+  const out = new Map<string, { retention: number[]; engagement: number[] }>();
+  for (const [videoID, group] of byVideo) {
+    // Retention: each viewer's furthest-reached position.
+    const maxPos = new Map<string, number>();
+    for (const e of group) {
+      const prev = maxPos.get(e.userID) ?? 0;
+      if (e.posPct > prev) maxPos.set(e.userID, e.posPct);
+    }
+    const viewers = maxPos.size;
+    const retention: number[] = [];
+    for (let b = 0; b < buckets; b++) {
+      if (viewers === 0) {
+        retention.push(0);
+        continue;
+      }
+      const threshold = ((b + 1) / buckets) * 100;
+      let reached = 0;
+      for (const p of maxPos.values()) if (p >= threshold) reached += 1;
+      retention.push(Math.round((100 * reached) / viewers));
+    }
+
+    // Engagement: replay/answer events binned by position, normalized to [0,1].
+    const bins = new Array<number>(cells).fill(0);
+    for (const e of group) {
+      if (e.kind !== "replay" && e.kind !== "answer") continue;
+      let idx = Math.floor((e.posPct / 100) * cells);
+      if (idx < 0) idx = 0;
+      if (idx >= cells) idx = cells - 1;
+      bins[idx] = (bins[idx] as number) + 1;
+    }
+    const max = bins.reduce((m, x) => (x > m ? x : m), 0);
+    const engagement = bins.map((x) => (max > 0 ? x / max : 0));
+
+    out.set(videoID, { retention, engagement });
+  }
+  return out;
+}

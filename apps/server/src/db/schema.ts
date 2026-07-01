@@ -194,6 +194,57 @@ export const progress = pgTable("progress", {
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 });
 
+// Per-user per-day activity rollup (bk-cj6.26 Part A / .15). `id` is
+// `${userID}:${day}` so a day upserts in place. User-owned read.
+export const dailyActivity = pgTable("daily_activity", {
+  id: text("id").primaryKey(), // userID:day
+  userID: text("user_id").notNull(),
+  day: text("day").notNull(), // YYYY-MM-DD
+  xp: integer("xp").notNull().default(0),
+  lessons: integer("lessons").notNull().default(0),
+  minutes: integer("minutes").notNull().default(0),
+});
+
+// Raw per-segment watch events (bk-cj6.26 Part B source). Feeds the materialized
+// videoAnalytics rollup. User-owned read.
+export const watchEvent = pgTable("watch_event", {
+  id: text("id").primaryKey(),
+  userID: text("user_id").notNull(),
+  videoID: text("video_id").notNull(),
+  posPct: integer("pos_pct").notNull(), // 0-100
+  kind: text("kind").$type<"reach" | "replay" | "answer">().notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
+// Materialized per-video retention + engagement (bk-cj6.19). Public read (like
+// video) — analytics overlay everyone can see.
+export const videoAnalytics = pgTable("video_analytics", {
+  videoID: text("video_id").primaryKey(),
+  retention: jsonb("retention").$type<readonly number[]>().notNull(), // per-bucket %, 0-100
+  engagement: jsonb("engagement").$type<readonly number[]>().notNull(), // per-cell density 0-1
+});
+
+// Editor quiz-marker timeline (bk-cj6.25). Public read (like video).
+export const quizMarker = pgTable("quiz_marker", {
+  id: text("id").primaryKey(),
+  videoID: text("video_id").notNull(),
+  pos: integer("pos").notNull(), // 0-100
+  type: text("type").$type<"mc" | "fill" | "reorder" | "meaning">().notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
+// Once-per-day chest claim record (bk-cj6.27). `id` is `${userID}:${day}` so a
+// day claims at most once. User-owned read.
+export const dailyChestClaim = pgTable("daily_chest_claim", {
+  id: text("id").primaryKey(), // userID:day
+  userID: text("user_id").notNull(),
+  day: text("day").notNull(),
+  cosmeticId: text("cosmetic_id").notNull(),
+  rarity: text("rarity").notNull(),
+  gems: integer("gems").notNull().default(0),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
 // --- relations (drizzle-zero turns these into Zero relationships) ------------
 export const userRelations = relations(user, ({ many }) => ({
   vocabulary: many(vocabulary),

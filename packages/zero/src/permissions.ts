@@ -31,6 +31,9 @@ export const permissions = definePermissions<AuthData, Schema>(schema, () => {
     league: { row: { select: ANYONE_CAN } },
     // Comments are public — everyone viewing a video sees its comments.
     comment: { row: { select: ANYONE_CAN } },
+    // Materialized per-video analytics + editor quiz markers are public (like video).
+    videoAnalytics: { row: { select: ANYONE_CAN } },
+    quizMarker: { row: { select: ANYONE_CAN } },
 
     // User-owned — only the authed user's own rows sync.
     user: { row: { select: [(auth, eb) => eb.cmp("id", "=", auth.sub)] } },
@@ -41,5 +44,8 @@ export const permissions = definePermissions<AuthData, Schema>(schema, () => {
     like: { row: { select: [(auth, eb) => eb.cmp("userID", "=", auth.sub)] } },
     follow: { row: { select: [(auth, eb) => eb.cmp("userID", "=", auth.sub)] } },
     progress: { row: { select: [(auth, eb) => eb.cmp("userID", "=", auth.sub)] } },
+    dailyActivity: { row: { select: [(auth, eb) => eb.cmp("userID", "=", auth.sub)] } },
+    watchEvent: { row: { select: [(auth, eb) => eb.cmp("userID", "=", auth.sub)] } },
+    dailyChestClaim: { row: { select: [(auth, eb) => eb.cmp("userID", "=", auth.sub)] } },
   } satisfies PermissionsConfig<AuthData, Schema>;
 });

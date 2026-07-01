@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { seedVideos } from "@/db/seed-videos.gen";
-import { aggregateByVideo, type ProgressRow } from "@/domain/analytics";
+import {
+  aggregateByVideo,
+  materializeVideoAnalytics,
+  type ProgressRow,
+  type WatchEventRow,
+} from "@/domain/analytics";
 
 // Dev seed: one demo user plus enough content to light up every screen over
 // Zero. The feed videos come from `seed-videos.gen.ts` — a snapshot of real,
@@ -148,6 +153,77 @@ async function seed() {
       { id: `${U}:running late`, userID: U, en: "running late", ru: "опаздывать", type: "phrase", source: "Мем", example: "Sorry, I am running late.", mastery: 2, createdAt: now - 70 },
       { id: `${U}:wiped out`, userID: U, en: "wiped out", ru: "вымотан, без сил", type: "phrase", source: "Мини-урок", example: "I'm wiped out today.", mastery: 0, createdAt: now - 60 },
       { id: `${U}:honestly`, userID: U, en: "honestly", ru: "честно говоря", type: "word", source: "Уличный опрос", example: "Honestly, I agree with you.", mastery: 3, createdAt: now - 50 },
+    ])
+    .onConflictDoNothing();
+
+  // Per-day activity rollup for the demo user — last 7 calendar days (bk-cj6.26).
+  // Day-keys are the YYYY-MM-DD prefix of each date's ISO string; id = U:day.
+  const activityDays = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(now - i * 86_400_000).toISOString().slice(0, 10);
+    return {
+      id: `${U}:${day}`,
+      userID: U,
+      day,
+      xp: 40 + ((i * 47) % 281), // 40..320-ish, varied
+      lessons: 1 + (i % 6), // 1..6
+      minutes: 8 + ((i * 13) % 40),
+    };
+  });
+  await db.insert(s.dailyActivity).values(activityDays).onConflictDoNothing();
+
+  // Raw watch events across the demo owner's first 3 clips from several viewers
+  // (bk-cj6.26). Mostly "reach" at increasing depths, plus a few replay/answer
+  // interactions; one row per (user, video, posPct, kind).
+  const watchViewers = [U, "u_max", "u_sofia", "u_timur", "u_jenny", "u_ilya"];
+  const watchEvents: WatchEventRow[] = [];
+  [v0, v1, v2].forEach((videoID, vi) => {
+    watchViewers.forEach((userID, ui) => {
+      // Deeper reach for earlier viewers, tapering per later video.
+      const depth = Math.max(20, 100 - ui * 12 - vi * 8);
+      for (let p = 20; p <= depth; p += 20) {
+        watchEvents.push({ userID, videoID, posPct: p, kind: "reach" });
+      }
+    });
+    // A few explicit interactions that feed the engagement curve.
+    watchEvents.push({ userID: U, videoID, posPct: 32, kind: "replay" });
+    watchEvents.push({ userID: "u_max", videoID, posPct: 68, kind: "answer" });
+    watchEvents.push({ userID: "u_sofia", videoID, posPct: 68 - vi * 4, kind: "replay" });
+  });
+  await db
+    .insert(s.watchEvent)
+    .values(
+      watchEvents.map((e) => ({
+        id: `${e.userID}:${e.videoID}:${e.posPct}:${e.kind}`,
+        userID: e.userID,
+        videoID: e.videoID,
+        posPct: e.posPct,
+        kind: e.kind,
+        createdAt: now,
+      })),
+    )
+    .onConflictDoNothing();
+
+  // Materialize per-video retention + engagement from exactly those events.
+  const analytics = materializeVideoAnalytics(watchEvents);
+  await db
+    .insert(s.videoAnalytics)
+    .values(
+      [...analytics].map(([videoID, { retention, engagement }]) => ({
+        videoID,
+        retention,
+        engagement,
+      })),
+    )
+    .onConflictDoNothing();
+
+  // Editor quiz-marker timeline for the first clip (bk-cj6.25) — matches the
+  // editor defaults (mc @ 32, fill @ 68) plus a meaning marker near the end.
+  await db
+    .insert(s.quizMarker)
+    .values([
+      { id: `${v0}:32:mc`, videoID: v0, pos: 32, type: "mc" as const, createdAt: now },
+      { id: `${v0}:68:fill`, videoID: v0, pos: 68, type: "fill" as const, createdAt: now },
+      { id: `${v0}:88:meaning`, videoID: v0, pos: 88, type: "meaning" as const, createdAt: now },
     ])
     .onConflictDoNothing();
 
