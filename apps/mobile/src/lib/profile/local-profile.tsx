@@ -13,16 +13,21 @@ import {
  * Device-local app profile — the bits of "where is this person in the journey"
  * that gate the UI but don't (yet) live in a synced Zero row.
  *
- * Why local and not Zero? Two reasons hold today:
- *  1. Zero runs local-only until a backend is configured, and screens fall back
- *     to placeholder data — so we can't reliably read `app_user.onboarded` back
- *     to decide whether to show the onboarding wall.
- *  2. The onboarding answers (CEFR level / goals / daily target) have no columns
- *     on `app_user` yet (adding them needs a Postgres migration — see
- *     docs/BACKEND_PLAN.md §6). Until then they're kept here.
+ * Why local at all? Zero runs local-only until a backend is configured, so the
+ * replica is often EMPTY and screens fall back to placeholder data — we can't
+ * treat the synced Zero row as the source of truth for "is this person past the
+ * onboarding wall". So this device-local store stays the offline SOURCE OF TRUTH
+ * for the gate.
  *
- * When the backend lands, `onboarded` should come from the synced user row and
- * this store becomes a cache; the answers move into new user columns.
+ * The `app_user` columns (onboarded, learningLevel, goals, dailyTarget) DO now
+ * exist on the user table. When Zero has a real replica, <ProfileSync/> (mounted
+ * inside AppZeroProvider) reconciles the synced user row back into this cache via
+ * `hydrateFromSync`. That reconciliation is strictly NON-REGRESSING: it never
+ * flips `onboarded` back to false and never lowers `quizzesCompleted`, so an
+ * empty replica can never wall an already-onboarded user.
+ *
+ * `prefs` (the onboarding answers) and `linkPromptDismissed` remain device-local
+ * by design — prefs sync outward in onboarding.tsx; reading them back is deferred.
  *
  * Persisted with expo-secure-store (same store family as auth-context) so it
  * survives relaunches. NOTE: this is intentionally NOT reset on signOut — a
@@ -60,6 +65,14 @@ type LocalProfileValue = LocalProfile & {
   completeOnboarding: (prefs: OnboardingPrefs) => void;
   recordQuizCompleted: () => void;
   dismissLinkPrompt: () => void;
+  /**
+   * Reconcile the device-local gate from the synced Zero user row. STRICTLY
+   * NON-REGRESSING so an empty replica can never wall an onboarded user:
+   *  - `onboarded` only ever moves false -> true (union; we never set it false).
+   *  - `quizzesCompleted` only ever rises (max; we never lower it).
+   * A no-op when nothing changes, to avoid render loops / needless writes.
+   */
+  hydrateFromSync: (patch: { onboarded?: boolean; quizzesCompleted?: number }) => void;
 };
 
 const LocalProfileContext = createContext<LocalProfileValue | null>(null);
@@ -102,9 +115,28 @@ export function LocalProfileProvider({ children }: { children: ReactNode }) {
     setProfile((p) => ({ ...p, linkPromptDismissed: true }));
   }, []);
 
+  const hydrateFromSync = useCallback((patch: { onboarded?: boolean; quizzesCompleted?: number }) => {
+    setProfile((p) => {
+      // Union onboarded (never false), raise quizzesCompleted (never lower).
+      const nextOnboarded = p.onboarded || patch.onboarded === true;
+      const nextQuizzes =
+        patch.quizzesCompleted != null ? Math.max(p.quizzesCompleted, patch.quizzesCompleted) : p.quizzesCompleted;
+      // Bail if nothing changed — avoids render loops and needless SecureStore writes.
+      if (nextOnboarded === p.onboarded && nextQuizzes === p.quizzesCompleted) return p;
+      return { ...p, onboarded: nextOnboarded, quizzesCompleted: nextQuizzes };
+    });
+  }, []);
+
   const value = useMemo<LocalProfileValue>(
-    () => ({ ...profile, ready, completeOnboarding, recordQuizCompleted, dismissLinkPrompt }),
-    [profile, ready, completeOnboarding, recordQuizCompleted, dismissLinkPrompt],
+    () => ({
+      ...profile,
+      ready,
+      completeOnboarding,
+      recordQuizCompleted,
+      dismissLinkPrompt,
+      hydrateFromSync,
+    }),
+    [profile, ready, completeOnboarding, recordQuizCompleted, dismissLinkPrompt, hydrateFromSync],
   );
 
   return <LocalProfileContext.Provider value={value}>{children}</LocalProfileContext.Provider>;

@@ -29,8 +29,19 @@ export const PROVISIONAL_MULT = 2;
 // (anti-farm). Capped so honest review isn't punished into the ground.
 export const REWATCH_PENALTY = 8;
 
+// Canonical onboarding self-assessment level keys — the single source of truth
+// shared by the mobile onboarding UI. No CEFR shown to users.
+export const LEARNING_LEVEL_KEYS = [
+  "only_starting",
+  "knows_basics",
+  "intermediate",
+  "confident",
+  "fluent",
+] as const;
+export type LearningLevelKey = (typeof LEARNING_LEVEL_KEYS)[number];
+
 // Onboarding self-assessment label -> starting ELO. No CEFR shown to users.
-export const ELO_SEED: Record<string, number> = {
+export const ELO_SEED: Record<LearningLevelKey, number> = {
   only_starting: 150,
   knows_basics: 350,
   intermediate: 500,
@@ -43,7 +54,7 @@ const clampElo = (x: number) => Math.max(ELO_MIN, Math.min(ELO_MAX, Math.round(x
 
 /** Starting ELO from the onboarding answer (unknown label -> neutral). */
 export function seedElo(label: string): number {
-  return ELO_SEED[label] ?? DEFAULT_ELO;
+  return ELO_SEED[label as LearningLevelKey] ?? DEFAULT_ELO;
 }
 
 /** Expected score (win probability) for a user of `elo` facing `difficulty`. */

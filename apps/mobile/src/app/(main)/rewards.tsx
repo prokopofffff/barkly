@@ -23,11 +23,24 @@ import { COLORS } from '@/constants/gav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { COSMETICS, type Cosmetic } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
-import { useCosmeticsQuery } from '@/lib/zero/queries';
+import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
+import { useCosmeticsQuery, useDailyChestClaimQuery } from '@/lib/zero/queries';
+import { rollDailyLoot, type ChestCosmetic } from '@barkly/zero';
 
-/** The prize the daily chest always rewards in the prototype. */
+/** The prize the daily chest rewards. Rolled by the shared `rollDailyLoot`. */
 type Loot = { name: string; rarity: string; id: string; color: string; gems: number };
-const CHEST_LOOT: Loot = { name: 'Шарф «Неон»', rarity: 'Редкое', id: 'scarf', color: COLORS.cyan, gems: 120 };
+
+/** Fallback loot used only when the cosmetics catalog is somehow empty. */
+const FALLBACK_LOOT: Loot = { name: 'Шарф «Неон»', rarity: 'Редкое', id: 'scarf', color: COLORS.cyan, gems: 120 };
+
+/** djb2-style string hash → positive 32-bit int, used to seed the daily roll. */
+function hashString(str: string): number {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 33) ^ str.charCodeAt(i);
+  }
+  return h >>> 0;
+}
 
 /** null = closed, 'shaking' = opening animation, Loot = the reveal. */
 type Reveal = null | 'shaking' | Loot;
@@ -41,8 +54,9 @@ export default function RewardsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { state, cosmetic, setCosmetic } = useGame();
+  const z = useZeroApp();
   const [reveal, setReveal] = useState<Reveal>(null);
-  const [chestReady, setChestReady] = useState(true);
+  const [localClaimed, setLocalClaimed] = useState(false);
 
   // Cosmetics catalog + ownership from Zero; falls back to the bundled
   // COSMETICS constant while the local replica is empty (no backend yet).
@@ -62,16 +76,78 @@ export default function RewardsScreen() {
     [cosmeticRows],
   );
 
+  // Stable calendar day captured ONCE per mount so render stays pure (no
+  // non-deterministic Date read during render/useMemo bodies). This YYYY-MM-DD
+  // is both the seed input and the claim row's `day` key.
+  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Deterministic per-(user, day) seed: same user + same day → same loot.
+  const seed = useMemo(
+    () => hashString(`${user?.userID ?? 'anon'}:${todayKey}`),
+    [user?.userID, todayKey],
+  );
+
+  // Daily roll (bk-cj6.27): delegate to the shared, deterministic
+  // `rollDailyLoot` so the client and the authoritative server agree on the
+  // loot for a given (user, day) seed. Map the screen's cosmetics into the
+  // `ChestCosmetic` shape it expects, and map its `DailyLoot | null` result
+  // back into the UI's `Loot` shape (id ← cosmeticId), falling back when empty.
+  const dailyLoot = useMemo<Loot>(() => {
+    const mapped: ChestCosmetic[] = cosmetics.map((c) => ({
+      id: c.id,
+      name: c.name,
+      rarity: c.rarity,
+      color: c.color,
+      owned: c.owned,
+    }));
+    const loot = rollDailyLoot(mapped, seed);
+    if (!loot) return FALLBACK_LOOT;
+    return {
+      name: loot.name,
+      rarity: loot.rarity,
+      id: loot.cosmeticId,
+      color: loot.color,
+      gems: loot.gems,
+    };
+  }, [cosmetics, seed]);
+
+  // Server-authoritative one-claim-per-day gate: the chest is ready only when no
+  // claim row exists for today. `localClaimed` covers the just-claimed animation
+  // window before the claim row syncs back.
+  const [claims] = useQuery(useDailyChestClaimQuery(user?.userID ?? ''));
+  const claimedToday =
+    localClaimed ||
+    claims.some((c) => c.id === `${user?.userID ?? ''}:${todayKey}` || c.day === todayKey);
+  const chestReady = !claimedToday;
+
   const openChest = () => {
     if (!chestReady) return;
     setReveal('shaking');
-    setTimeout(() => setReveal(CHEST_LOOT), 900);
+    setTimeout(() => setReveal(dailyLoot), 900);
   };
 
   const claim = () => {
+    const loot = dailyLoot;
     setReveal(null);
-    setChestReady(false);
-    setCosmetic('scarf');
+    setLocalClaimed(true);
+    setCosmetic(loot.id as Cosmetic['id']);
+
+    // Record the claim server-side (idempotent on `${userID}:${day}`), granting
+    // the cosmetic and crediting gems. Optimistic local UI updates already ran.
+    if (ZERO_ENABLED && user?.userID) {
+      const r = z.mutate.claimDailyChest({
+        id: `${user.userID}:${todayKey}`,
+        userID: user.userID,
+        day: todayKey,
+        cosmeticId: loot.id,
+        rarity: loot.rarity,
+        gems: loot.gems,
+        createdAt: Date.now(),
+        userGems: state.gems + loot.gems,
+      });
+      r.client.catch(() => {});
+      r.server.catch(() => {});
+    }
   };
 
   return (

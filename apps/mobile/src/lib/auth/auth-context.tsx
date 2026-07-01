@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import {
   createContext,
@@ -70,10 +71,10 @@ async function api<T>(path: string, body: unknown, token?: string | null): Promi
   return (await res.json()) as T;
 }
 
-// Lightweight random id used only for the offline (no-backend) fallback.
+// Cryptographically-strong random id used only for the offline (no-backend)
+// fallback. Crypto.randomUUID() is synchronous, so callers still get a string.
 function randomId(prefix: string): string {
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `${prefix}_${Date.now().toString(36)}${rand}`;
+  return `${prefix}_${Crypto.randomUUID().replace(/-/g, '')}`;
 }
 
 function sessionToUser(s: Session): AuthUser {

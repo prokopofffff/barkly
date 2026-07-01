@@ -1,3 +1,4 @@
+import { useQuery } from '@rocicorp/zero/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,12 +25,31 @@ import { Sharik } from '@/components/mascot';
 import { PrimaryButton } from '@/components/primary-button';
 import { SectionHead } from '@/components/section-head';
 import { COLORS, GRADIENTS } from '@/constants/gav';
+import { useAuth } from '@/lib/auth/auth-context';
 import { seeded } from '@/lib/feed/prng';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
+import {
+  useCreatorVideosQuery,
+  useQuizMarkersQuery,
+  useVideoAnalyticsQuery,
+  useVideoSubtitlesQuery,
+} from '@/lib/zero/queries';
+import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
 
 type QuizType = 'mc' | 'fill' | 'reorder' | 'meaning';
 type Marker = { pos: number; type: QuizType };
-type Sub = { t: string; text: string };
+/** One subtitle token rendered in the editor: the word, its translation
+ * (when present), and whether it's a highlighted key vocabulary word. */
+type Sub = { w: string; t?: string; key?: boolean };
+
+/** Placeholder subtitle tokens shown until a real video's `subtitle` jsonb loads. */
+const PLACEHOLDER_SUBS: Sub[] = [
+  { w: 'pull', t: 'тянуть', key: true },
+  { w: 'off', key: true },
+  { w: 'that', t: 'это' },
+  { w: 'was', t: 'было' },
+  { w: 'insane', t: 'безумно', key: true },
+];
 
 const TYPE_COLOR: Record<QuizType, string> = {
   mc: COLORS.lime,
@@ -55,28 +75,60 @@ type Studio = 'home' | 'editor' | 'stats';
  */
 export default function StudioScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const z = useZeroApp();
   const [view, setView] = useState<Studio>('home');
-  const [markers, setMarkers] = useState<Marker[]>([
+  const [localMarkers, setLocalMarkers] = useState<Marker[]>([
     { pos: 32, type: 'mc' },
     { pos: 68, type: 'fill' },
   ]);
   const [playhead, setPlayhead] = useState(45);
   const [aiBusy, setAiBusy] = useState(false);
   const aiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const subs: Sub[] = [
-    { t: '0:02', text: "I can't believe you pulled this off" },
-    { t: '0:05', text: 'That was absolutely insane' },
-    { t: '0:08', text: 'We should do it again sometime' },
-  ];
+
+  // The editor previews the creator's first owned video's subtitles, when any
+  // exist; otherwise the editor falls back to placeholder subs.
+  const [ownVideos] = useQuery(useCreatorVideosQuery(user?.userID ?? ''));
+  const editorVideoId = ownVideos[0]?.id;
+
+  // Quiz markers for the edited video come from Zero (bk-cj6.25). When the
+  // edited video has persisted markers, render those; otherwise fall back to
+  // the local default markers so the editor still shows a timeline offline.
+  const [markerRows] = useQuery(useQuizMarkersQuery(editorVideoId ?? ''));
+  const markers: Marker[] =
+    editorVideoId && markerRows.length > 0
+      ? markerRows.map((m) => ({ pos: m.pos, type: m.type as QuizType }))
+      : localMarkers;
 
   useEffect(() => () => {
     if (aiTimer.current) clearTimeout(aiTimer.current);
   }, []);
 
+  // Persist a marker to Zero when a backend + edited video are available.
+  // Returns true when the write was issued (so callers can skip the local
+  // fallback), false otherwise (offline / no video → keep local optimistic state).
+  const persistMarker = (pos: number, type: QuizType): boolean => {
+    if (ZERO_ENABLED && editorVideoId) {
+      const r = z.mutate.addQuizMarker({
+        id: `${editorVideoId}:${pos}:${type}`,
+        videoID: editorVideoId,
+        pos,
+        type,
+        createdAt: Date.now(),
+      });
+      r.client.catch(() => {});
+      r.server.catch(() => {});
+      return true;
+    }
+    return false;
+  };
+
   const addMarker = () => {
     if (markers.some((m) => Math.abs(m.pos - playhead) < 5)) return;
-    const next: Marker = { pos: playhead, type: 'mc' };
-    setMarkers([...markers, next].sort((a, b) => a.pos - b.pos));
+    if (!persistMarker(playhead, 'mc')) {
+      const next: Marker = { pos: playhead, type: 'mc' };
+      setLocalMarkers((m) => [...m, next].sort((a, b) => a.pos - b.pos));
+    }
   };
 
   const genAI = () => {
@@ -84,8 +136,10 @@ export default function StudioScreen() {
     setAiBusy(true);
     aiTimer.current = setTimeout(() => {
       setAiBusy(false);
-      const aiMarker: Marker = { pos: 88, type: 'meaning' };
-      setMarkers((m) => [...m, aiMarker].sort((a, b) => a.pos - b.pos));
+      if (!persistMarker(88, 'meaning')) {
+        const aiMarker: Marker = { pos: 88, type: 'meaning' };
+        setLocalMarkers((m) => [...m, aiMarker].sort((a, b) => a.pos - b.pos));
+      }
     }, 1400);
   };
 
@@ -131,7 +185,7 @@ export default function StudioScreen() {
         {view === 'home' && (
           <MyVideosHome onEditor={() => setView('editor')} onStats={() => setView('stats')} />
         )}
-        {view === 'stats' && <AnalyticsTab />}
+        {view === 'stats' && <AnalyticsTab video={ownVideos[0]} />}
         {view === 'editor' && (
           <Editor
             markers={markers}
@@ -140,7 +194,7 @@ export default function StudioScreen() {
             onTrackPress={setPlayhead}
             onAddMarker={addMarker}
             onGenAI={genAI}
-            subs={subs}
+            videoId={editorVideoId}
           />
         )}
       </ScrollView>
@@ -149,12 +203,34 @@ export default function StudioScreen() {
 }
 
 /* ----------------------- Мои видео (hub) ----------------------- */
+type StudioVideo = { title: string; grad: readonly [string, string]; views: string; done: string; quizzes: number };
+
+// Compact view count formatter, e.g. 1200 -> "1.2K", 940 -> "940".
+const formatViews = (n: number): string => (n >= 1000 ? `${Math.round(n / 100) / 10}K` : String(n));
+
+// Placeholder list shown before the creator has any published clips in the
+// replica (same spirit as the feed's SAMPLE_VIDEOS fallback) — never blank.
+const SAMPLE_MINE: StudioVideo[] = [
+  { title: 'Фразовые глаголы: pull off', grad: SAMPLE_VIDEOS[0].bgGradient, views: '42K', done: '78%', quizzes: 3 },
+  { title: '3 способа сказать «я устал»', grad: SAMPLE_VIDEOS[3].bgGradient, views: '128K', done: '85%', quizzes: 2 },
+  { title: 'Сленг: no cap, fr fr', grad: SAMPLE_VIDEOS[1].bgGradient, views: '9.4K', done: '61%', quizzes: 1 },
+];
+
 function MyVideosHome({ onEditor, onStats }: { onEditor: () => void; onStats: () => void }) {
-  const mine = [
-    { title: 'Фразовые глаголы: pull off', grad: SAMPLE_VIDEOS[0].bgGradient, views: '42K', done: '78%', quizzes: 3 },
-    { title: '3 способа сказать «я устал»', grad: SAMPLE_VIDEOS[3].bgGradient, views: '128K', done: '85%', quizzes: 2 },
-    { title: 'Сленг: no cap, fr fr', grad: SAMPLE_VIDEOS[1].bgGradient, views: '9.4K', done: '61%', quizzes: 1 },
-  ];
+  const { user } = useAuth();
+  const [rows] = useQuery(useCreatorVideosQuery(user?.userID ?? ''));
+  // `views`/`done` come from the real integer columns on the video row
+  // (views, completionRate 0-100). One quiz jsonb per row.
+  const mine: StudioVideo[] =
+    rows.length === 0
+      ? SAMPLE_MINE
+      : rows.map((v) => ({
+          title: v.caption || v.catEn,
+          grad: [v.bgGradient[0], v.bgGradient[1]] as const,
+          views: formatViews(v.views ?? 0),
+          done: `${v.completionRate ?? 0}%`,
+          quizzes: 1,
+        }));
 
   return (
     <View style={{ paddingHorizontal: 22 }}>
@@ -188,7 +264,7 @@ function MyVideosHome({ onEditor, onStats }: { onEditor: () => void; onStats: ()
         </Pressable>
       </View>
 
-      <SectionHead title="Опубликовано" action="3 видео" />
+      <SectionHead title="Опубликовано" action={`${mine.length} видео`} />
       <View className="gap-2.5">
         {mine.map((m, i) => (
           <Pressable
@@ -244,7 +320,7 @@ function Editor({
   onTrackPress,
   onAddMarker,
   onGenAI,
-  subs,
+  videoId,
 }: {
   markers: Marker[];
   playhead: number;
@@ -252,9 +328,18 @@ function Editor({
   onTrackPress: (pos: number) => void;
   onAddMarker: () => void;
   onGenAI: () => void;
-  subs: Sub[];
+  videoId?: string;
 }) {
   const trackW = useRef(0);
+
+  // The subtitle list comes from the selected video's `subtitle` jsonb (flat
+  // SubtitleToken[] — no timecodes). Falls back to placeholders when there's no
+  // video selected or the row carries no tokens.
+  const [video] = useQuery(useVideoSubtitlesQuery(videoId ?? ''));
+  const subs: Sub[] =
+    video && video.subtitle.length > 0
+      ? video.subtitle.map((tok) => ({ w: tok.w, t: tok.t, key: tok.key }))
+      : PLACEHOLDER_SUBS;
 
   const onTrackLayout = (e: LayoutChangeEvent) => {
     trackW.current = e.nativeEvent.layout.width;
@@ -412,12 +497,23 @@ function Editor({
               className="flex-row items-center gap-2.5 rounded-[12px] bg-surface-2"
               style={{ paddingVertical: 10, paddingHorizontal: 12 }}
             >
-              <Text className="font-mono" style={{ fontSize: 11, color: COLORS.lime }}>
-                {s.t}
+              <Text className="font-mono" style={{ fontSize: 11, color: COLORS.textFaint }}>
+                {i + 1}
               </Text>
-              <Text className="flex-1 font-nunito-bold text-content" style={{ fontSize: 13 }}>
-                {s.text}
+              <Text
+                className="font-nunito-x"
+                style={{ fontSize: 13, color: s.key ? COLORS.lime : COLORS.text }}
+              >
+                {s.w}
               </Text>
+              {s.t ? (
+                <Text className="flex-1 font-nunito-bold text-content-dim" style={{ fontSize: 13 }}>
+                  {s.t}
+                </Text>
+              ) : (
+                <View className="flex-1" />
+              )}
+              {s.key && <Icon name="sparkle" size={12} color={COLORS.lime} />}
               <Icon name="edit" size={16} color={COLORS.textFaint} />
             </View>
           ))}
@@ -451,17 +547,42 @@ const STAT_TILES: [string, string, string][] = [
   ['❤️', '12K', 'Лайки'],
 ];
 
-function AnalyticsTab() {
+type AnalyticsVideo = { id: string; views?: number | null; completionRate?: number | null; likes?: string | null };
+
+function AnalyticsTab({ video }: { video?: AnalyticsVideo }) {
+  const [analytics] = useQuery(useVideoAnalyticsQuery(video?.id ?? ''));
+
+  // Retention curve: prefer materialized analytics, else the static fallback.
+  const retention: readonly number[] =
+    analytics && analytics.retention.length > 0 ? analytics.retention : RETENTION;
+
+  // Engagement heatmap: prefer materialized analytics (padded/sliced to the
+  // 35-cell grid the map renders), else the seeded PRNG fallback.
   const heat = useMemo(() => {
+    if (analytics && analytics.engagement.length > 0) {
+      const cells = analytics.engagement.slice(0, 35);
+      while (cells.length < 35) cells.push(0);
+      return cells;
+    }
     const rng = seeded(20240603);
     return Array.from({ length: 35 }, () => rng());
-  }, []);
+  }, [analytics]);
+
+  // Stat tiles: derived from the real video row when present, else the static
+  // fallback trio.
+  const statTiles: [string, string, string][] = video
+    ? [
+        ['👁', formatViews(video.views ?? 0), 'Просмотры'],
+        ['⚡', `${video.completionRate ?? 0}%`, 'Заверш.'],
+        ['❤️', video.likes ?? '0', 'Лайки'],
+      ]
+    : STAT_TILES;
 
   return (
     <View style={{ paddingHorizontal: 22 }}>
       {/* top stats */}
       <View className="flex-row gap-2.5" style={{ marginBottom: 18 }}>
-        {STAT_TILES.map(([e, v, l], i) => (
+        {statTiles.map(([e, v, l], i) => (
           <View
             key={i}
             className="flex-1 items-center rounded-[20px] bg-surface"
@@ -487,7 +608,7 @@ function AnalyticsTab() {
           Удержание зрителей
         </Text>
         <View className="flex-row items-end gap-[5px]" style={{ height: 96 }}>
-          {RETENTION.map((h, i) => (
+          {retention.map((h, i) => (
             <View key={i} className="flex-1 overflow-hidden" style={{ height: `${h}%`, borderTopLeftRadius: 5, borderTopRightRadius: 5, opacity: 0.4 + (h / 100) * 0.6 }}>
               <LinearGradient
                 colors={[COLORS.lime, 'rgba(182,242,61,0.2)']}

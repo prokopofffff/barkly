@@ -15,18 +15,22 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useGame } from '@/lib/feed/game-context';
 import { useLocalProfile } from '@/lib/profile/local-profile';
 import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
+import { ELO_SEED, type LearningLevelKey, STARTER_BONUS_XP } from '@barkly/zero';
 
 const STEPS = 5;
 
 // Friendly self-assessment — maps to a starting ELO server-side (no CEFR shown).
-// Keys must match ELO_SEED in apps/server/src/domain/lessons/elo.ts.
+// Keys must match ELO_SEED in packages/zero/src/elo.ts (@barkly/zero); typing
+// each `k` as LearningLevelKey makes any drift a compile-time error.
 const LEVELS = [
   { k: 'only_starting', t: 'Только начинаю', d: 'Знаю пару слов', e: '🌱' },
   { k: 'knows_basics', t: 'Знаю основы', d: 'Понимаю простые фразы', e: '🌿' },
   { k: 'intermediate', t: 'Средний уровень', d: 'Смотрю с субтитрами', e: '🌳' },
   { k: 'confident', t: 'Уверенно понимаю', d: 'Свободно общаюсь', e: '🚀' },
   { k: 'fluent', t: 'Свободно', d: 'Почти как родной', e: '🦅' },
-] as const;
+  // `satisfies` ties each key to a real ELO_SEED entry (@barkly/zero), so any
+  // typo/drift fails typecheck instead of silently falling back to DEFAULT_ELO.
+] satisfies { k: LearningLevelKey & keyof typeof ELO_SEED; t: string; d: string; e: string }[];
 
 const GOALS = [
   { k: 'travel', t: 'Путешествия', e: '✈️' },
@@ -43,6 +47,7 @@ const TARGETS = [
   { v: 30, t: 'Хардкор', d: '30 мин — стрик-машина' },
 ] as const;
 
+// Display-only category labels for the intro screen (no strict backend enum).
 const INTRO_CHIPS = ['🎬 Сцены', '😂 Мемы', '🎤 Интервью', '📚 Мини-уроки'];
 
 const CTA_LABEL = ['Поехали 🐾', 'Продолжить', 'Продолжить', 'Продолжить', 'Забрать и начать'];
@@ -74,8 +79,8 @@ export default function OnboardingScreen() {
       // then award the starter bonus and drop into the feed.
       const prefs = { level: level ?? '', goals, target };
       completeOnboarding(prefs);
-      earn(50, 1);
-      // Sync the answers to the user row when a backend is wired (the +50 XP
+      earn(STARTER_BONUS_XP, 1);
+      // Sync the answers to the user row when a backend is wired (the starter XP
       // bonus rides on earnXp above, so completeOnboarding stays XP-free).
       if (ZERO_ENABLED && user?.userID) {
         const r = z.mutate.completeOnboarding({
@@ -218,7 +223,7 @@ export default function OnboardingScreen() {
               >
                 <Icon name="bolt" size={22} color={COLORS.gold} />
                 <Text className="font-nunito-x" style={{ fontSize: 17, color: COLORS.gold }}>
-                  +50 XP стартовый бонус
+                  +{STARTER_BONUS_XP} XP стартовый бонус
                 </Text>
               </View>
             </View>

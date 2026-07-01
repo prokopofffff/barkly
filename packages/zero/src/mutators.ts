@@ -145,6 +145,85 @@ export function createMutators() {
     },
 
     /**
+     * Upsert the running per-day activity rollup (bk-cj6.26). The client sends
+     * TODAY's running totals (xp/lessons/minutes); `id` is `${userID}:${day}` so
+     * a day upserts in place. Server-side recompute from authoritative event
+     * history is a future anti-cheat step (§5) — the client totals stand for now.
+     */
+    async recordDailyActivity(
+      tx: Tx,
+      a: { id: string; userID: string; day: string; xp: number; lessons: number; minutes: number },
+    ) {
+      await tx.mutate.dailyActivity.upsert({ ...a });
+    },
+
+    /**
+     * Append a raw watch event (bk-cj6.26) — a viewer reaching a position, a
+     * scrub-back replay, or a quiz answer. These are insert-only source rows that
+     * the server later materializes into the videoAnalytics retention/engagement
+     * curves.
+     */
+    async recordWatchEvent(
+      tx: Tx,
+      a: {
+        id: string;
+        userID: string;
+        videoID: string;
+        posPct: number;
+        kind: 'reach' | 'replay' | 'answer';
+        createdAt: number;
+      },
+    ) {
+      await tx.mutate.watchEvent.insert({ ...a });
+    },
+
+    /** Add / move a quiz marker on the editor timeline (bk-cj6.25). Upsert by id. */
+    async addQuizMarker(
+      tx: Tx,
+      a: { id: string; videoID: string; pos: number; type: 'mc' | 'fill' | 'reorder' | 'meaning'; createdAt: number },
+    ) {
+      await tx.mutate.quizMarker.upsert({ ...a });
+    },
+
+    /** Remove a quiz marker from the editor timeline (bk-cj6.25). */
+    async removeQuizMarker(tx: Tx, a: { id: string }) {
+      await tx.mutate.quizMarker.delete({ id: a.id });
+    },
+
+    /**
+     * Claim the once-per-day chest (bk-cj6.27): record the claim, grant the
+     * rolled cosmetic, and set gems + equip it. `id` is `${userID}:${day}` so the
+     * insert is idempotent — one claim per user per day. Mirrors `claimReward`
+     * for the cosmetic/user side (the client sends its optimistic `userGems`; the
+     * server recomputes from state, §5).
+     */
+    async claimDailyChest(
+      tx: Tx,
+      a: {
+        id: string;
+        userID: string;
+        day: string;
+        cosmeticId: string;
+        rarity: string;
+        gems: number;
+        createdAt: number;
+        userGems: number;
+      },
+    ) {
+      await tx.mutate.dailyChestClaim.insert({
+        id: a.id,
+        userID: a.userID,
+        day: a.day,
+        cosmeticId: a.cosmeticId,
+        rarity: a.rarity,
+        gems: a.gems,
+        createdAt: a.createdAt,
+      });
+      await tx.mutate.cosmetic.update({ id: `${a.userID}:${a.cosmeticId}`, owned: true });
+      await tx.mutate.user.update({ id: a.userID, gems: a.userGems, mascotCosmetic: a.cosmeticId });
+    },
+
+    /**
      * Persist onboarding answers and flip `onboarded`. The starter XP bonus is
      * awarded separately via `earnXp` (so the merge logic can exclude it), so
      * this mutator intentionally does NOT touch xp/gems.

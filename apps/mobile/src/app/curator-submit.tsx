@@ -24,8 +24,8 @@ import { useCurrentUserQuery } from '@/lib/zero/queries';
  */
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
-// Placeholder team inbox for curator applications — swap for the real address.
-const CURATOR_CONTACT_EMAIL = 'curators@barkly.app';
+// Team inbox for curator applications — overridable via EXPO_PUBLIC_CURATOR_EMAIL.
+const CURATOR_CONTACT_EMAIL = process.env.EXPO_PUBLIC_CURATOR_EMAIL ?? 'curators@barkly.app';
 
 type SubmitResult = { id: string; status: 'queued' | 'duplicate'; existing?: 'video' | 'ingest' };
 

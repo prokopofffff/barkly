@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@rocicorp/zero/react';
+import { weeklyHeights } from '@barkly/zero';
 
 import { Avatar } from '@/components/avatar';
 import { Icon, type IconName } from '@/components/icon';
@@ -19,7 +20,7 @@ import { ACHIEVEMENTS, USER, type Achievement } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
 import { useLocalProfile } from '@/lib/profile/local-profile';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
-import { useAchievementsQuery, useCurrentUserQuery } from '@/lib/zero/queries';
+import { useAchievementsQuery, useCurrentUserQuery, useDailyActivityQuery } from '@/lib/zero/queries';
 
 const WEEK = [40, 70, 30, 90, 55, 100, 65];
 const DAYS = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
@@ -37,7 +38,29 @@ export default function ProfileScreen() {
   const { linkPromptDismissed } = useLocalProfile();
   const [me] = useQuery(useCurrentUserQuery(user?.userID ?? ''));
   const [achievementRows] = useQuery(useAchievementsQuery(user?.userID ?? ''));
+  const [activityRows] = useQuery(useDailyActivityQuery(user?.userID ?? ''));
   const isCurator = me?.role === 'curator' || me?.role === 'admin';
+
+  // cj6.15: the last 7 day-keys (YYYY-MM-DD), OLDEST first so they align with the
+  // left-to-right DAYS labels. Captured once per mount via a lazy state initializer
+  // (impure Date.now allowed there) so the window reads a stable "today" rather than
+  // shifting on every render.
+  const [dayKeys] = useState(() => {
+    const todayMs = Date.now();
+    return Array.from({ length: 7 }, (_, i) =>
+      new Date(todayMs - (6 - i) * 86400000).toISOString().slice(0, 10),
+    );
+  });
+
+  // cj6.15: drive the weekly-activity bars from the daily-XP rollup; fall back to
+  // the WEEK demo constant while the local replica is empty so it's never blank.
+  const heights =
+    activityRows.length === 0
+      ? WEEK
+      : weeklyHeights(
+          activityRows.map((r) => ({ day: r.day, xp: r.xp ?? 0 })),
+          dayKeys,
+        );
 
   // cj6.8: drive the header/stats from the user row, falling back to the USER
   // demo constant while the local replica is empty (no backend yet).
@@ -332,7 +355,7 @@ export default function ProfileScreen() {
           style={{ padding: 18, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line }}
         >
           <View className="flex-row items-end justify-between" style={{ height: 110, gap: 8 }}>
-            {WEEK.map((h, i) => (
+            {heights.map((h, i) => (
               <View key={DAYS[i] + i} className="flex-1 items-center justify-end" style={{ height: '100%', gap: 8 }}>
                 {i === 5 ? (
                   <LinearGradient
