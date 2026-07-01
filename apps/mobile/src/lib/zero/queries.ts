@@ -87,3 +87,27 @@ export function useVideoSubtitlesQuery(videoID: string) {
   const z = useZero();
   return z.query.video.where('id', '=', videoID).one();
 }
+
+/** The user's per-day XP rollup (daily-activity heatmap / streak). */
+export function useDailyActivityQuery(userID: string) {
+  const z = useZero();
+  return z.query.dailyActivity.where('userID', '=', userID);
+}
+
+/** Materialized retention + engagement for one clip (creator analytics). */
+export function useVideoAnalyticsQuery(videoID: string) {
+  const z = useZero();
+  return z.query.videoAnalytics.where('videoID', '=', videoID).one();
+}
+
+/** The editor's quiz-marker timeline for a clip, in playback order. */
+export function useQuizMarkersQuery(videoID: string) {
+  const z = useZero();
+  return z.query.quizMarker.where('videoID', '=', videoID).orderBy('pos', 'asc');
+}
+
+/** The user's chest-claim records — gates the one-per-day daily chest. */
+export function useDailyChestClaimQuery(userID: string) {
+  const z = useZero();
+  return z.query.dailyChestClaim.where('userID', '=', userID);
+}

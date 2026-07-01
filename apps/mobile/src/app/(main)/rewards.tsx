@@ -23,19 +23,15 @@ import { COLORS } from '@/constants/gav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { COSMETICS, type Cosmetic } from '@/lib/feed/app-data';
 import { useGame } from '@/lib/feed/game-context';
-import { seeded } from '@/lib/feed/prng';
-import { useCosmeticsQuery } from '@/lib/zero/queries';
+import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
+import { useCosmeticsQuery, useDailyChestClaimQuery } from '@/lib/zero/queries';
+import { rollDailyLoot, type ChestCosmetic } from '@barkly/zero';
 
-/** The prize the daily chest rewards. INTERIM (bk-cj6.13): rolled client-side. */
+/** The prize the daily chest rewards. Rolled by the shared `rollDailyLoot`. */
 type Loot = { name: string; rarity: string; id: string; color: string; gems: number };
 
 /** Fallback loot used only when the cosmetics catalog is somehow empty. */
 const FALLBACK_LOOT: Loot = { name: 'Шарф «Неон»', rarity: 'Редкое', id: 'scarf', color: COLORS.cyan, gems: 120 };
-
-/** How likely each rarity is to be rolled from the daily chest. */
-const RARITY_WEIGHT: Record<string, number> = { Обычное: 6, Редкое: 3, Легендарное: 1 };
-/** Gems awarded per rarity tier (crediting itself is deferred to bk-cj6.27). */
-const RARITY_GEMS: Record<string, number> = { Обычное: 60, Редкое: 120, Легендарное: 300 };
 
 /** djb2-style string hash → positive 32-bit int, used to seed the daily roll. */
 function hashString(str: string): number {
@@ -58,8 +54,9 @@ export default function RewardsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { state, cosmetic, setCosmetic } = useGame();
+  const z = useZeroApp();
   const [reveal, setReveal] = useState<Reveal>(null);
-  const [chestReady, setChestReady] = useState(true);
+  const [localClaimed, setLocalClaimed] = useState(false);
 
   // Cosmetics catalog + ownership from Zero; falls back to the bundled
   // COSMETICS constant while the local replica is empty (no backend yet).
@@ -80,45 +77,48 @@ export default function RewardsScreen() {
   );
 
   // Stable calendar day captured ONCE per mount so render stays pure (no
-  // non-deterministic Date read during render/useMemo bodies).
-  const dayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // non-deterministic Date read during render/useMemo bodies). This YYYY-MM-DD
+  // is both the seed input and the claim row's `day` key.
+  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   // Deterministic per-(user, day) seed: same user + same day → same loot.
   const seed = useMemo(
-    () => hashString(`${user?.userID ?? 'anon'}:${dayKey}`),
-    [user?.userID, dayKey],
+    () => hashString(`${user?.userID ?? 'anon'}:${todayKey}`),
+    [user?.userID, todayKey],
   );
 
-  // INTERIM daily roll (bk-cj6.13): rarity-weighted pick from the catalog,
-  // preferring not-yet-owned cosmetics. All randomness comes from the seeded
-  // PRNG, so this useMemo is pure and stable within a day. Server-authoritative
-  // rolling + gem crediting is deferred to bk-cj6.27.
+  // Daily roll (bk-cj6.27): delegate to the shared, deterministic
+  // `rollDailyLoot` so the client and the authoritative server agree on the
+  // loot for a given (user, day) seed. Map the screen's cosmetics into the
+  // `ChestCosmetic` shape it expects, and map its `DailyLoot | null` result
+  // back into the UI's `Loot` shape (id ← cosmeticId), falling back when empty.
   const dailyLoot = useMemo<Loot>(() => {
-    const pool = cosmetics.filter((c) => c.owned === false);
-    const candidates = pool.length > 0 ? pool : cosmetics;
-    if (candidates.length === 0) return FALLBACK_LOOT;
-
-    const rng = seeded(seed);
-    const weights = candidates.map((c) => RARITY_WEIGHT[c.rarity] ?? 3);
-    const total = weights.reduce((a, b) => a + b, 0);
-    let roll = rng() * total;
-    let chosen = candidates[candidates.length - 1];
-    for (let i = 0; i < candidates.length; i++) {
-      roll -= weights[i];
-      if (roll < 0) {
-        chosen = candidates[i];
-        break;
-      }
-    }
-
+    const mapped: ChestCosmetic[] = cosmetics.map((c) => ({
+      id: c.id,
+      name: c.name,
+      rarity: c.rarity,
+      color: c.color,
+      owned: c.owned,
+    }));
+    const loot = rollDailyLoot(mapped, seed);
+    if (!loot) return FALLBACK_LOOT;
     return {
-      name: chosen.name,
-      rarity: chosen.rarity,
-      id: chosen.id,
-      color: chosen.color,
-      gems: RARITY_GEMS[chosen.rarity] ?? 120,
+      name: loot.name,
+      rarity: loot.rarity,
+      id: loot.cosmeticId,
+      color: loot.color,
+      gems: loot.gems,
     };
   }, [cosmetics, seed]);
+
+  // Server-authoritative one-claim-per-day gate: the chest is ready only when no
+  // claim row exists for today. `localClaimed` covers the just-claimed animation
+  // window before the claim row syncs back.
+  const [claims] = useQuery(useDailyChestClaimQuery(user?.userID ?? ''));
+  const claimedToday =
+    localClaimed ||
+    claims.some((c) => c.id === `${user?.userID ?? ''}:${todayKey}` || c.day === todayKey);
+  const chestReady = !claimedToday;
 
   const openChest = () => {
     if (!chestReady) return;
@@ -127,9 +127,27 @@ export default function RewardsScreen() {
   };
 
   const claim = () => {
+    const loot = dailyLoot;
     setReveal(null);
-    setChestReady(false);
-    setCosmetic(dailyLoot.id as Cosmetic['id']);
+    setLocalClaimed(true);
+    setCosmetic(loot.id as Cosmetic['id']);
+
+    // Record the claim server-side (idempotent on `${userID}:${day}`), granting
+    // the cosmetic and crediting gems. Optimistic local UI updates already ran.
+    if (ZERO_ENABLED && user?.userID) {
+      const r = z.mutate.claimDailyChest({
+        id: `${user.userID}:${todayKey}`,
+        userID: user.userID,
+        day: todayKey,
+        cosmeticId: loot.id,
+        rarity: loot.rarity,
+        gems: loot.gems,
+        createdAt: Date.now(),
+        userGems: state.gems + loot.gems,
+      });
+      r.client.catch(() => {});
+      r.server.catch(() => {});
+    }
   };
 
   return (

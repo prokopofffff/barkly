@@ -28,7 +28,13 @@ import { COLORS, GRADIENTS } from '@/constants/gav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { seeded } from '@/lib/feed/prng';
 import { SAMPLE_VIDEOS } from '@/lib/feed/sample-videos';
-import { useCreatorVideosQuery, useVideoSubtitlesQuery } from '@/lib/zero/queries';
+import {
+  useCreatorVideosQuery,
+  useQuizMarkersQuery,
+  useVideoAnalyticsQuery,
+  useVideoSubtitlesQuery,
+} from '@/lib/zero/queries';
+import { ZERO_ENABLED, useZeroApp } from '@/lib/zero/provider';
 
 type QuizType = 'mc' | 'fill' | 'reorder' | 'meaning';
 type Marker = { pos: number; type: QuizType };
@@ -70,8 +76,9 @@ type Studio = 'home' | 'editor' | 'stats';
 export default function StudioScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const z = useZeroApp();
   const [view, setView] = useState<Studio>('home');
-  const [markers, setMarkers] = useState<Marker[]>([
+  const [localMarkers, setLocalMarkers] = useState<Marker[]>([
     { pos: 32, type: 'mc' },
     { pos: 68, type: 'fill' },
   ]);
@@ -84,14 +91,44 @@ export default function StudioScreen() {
   const [ownVideos] = useQuery(useCreatorVideosQuery(user?.userID ?? ''));
   const editorVideoId = ownVideos[0]?.id;
 
+  // Quiz markers for the edited video come from Zero (bk-cj6.25). When the
+  // edited video has persisted markers, render those; otherwise fall back to
+  // the local default markers so the editor still shows a timeline offline.
+  const [markerRows] = useQuery(useQuizMarkersQuery(editorVideoId ?? ''));
+  const markers: Marker[] =
+    editorVideoId && markerRows.length > 0
+      ? markerRows.map((m) => ({ pos: m.pos, type: m.type as QuizType }))
+      : localMarkers;
+
   useEffect(() => () => {
     if (aiTimer.current) clearTimeout(aiTimer.current);
   }, []);
 
+  // Persist a marker to Zero when a backend + edited video are available.
+  // Returns true when the write was issued (so callers can skip the local
+  // fallback), false otherwise (offline / no video → keep local optimistic state).
+  const persistMarker = (pos: number, type: QuizType): boolean => {
+    if (ZERO_ENABLED && editorVideoId) {
+      const r = z.mutate.addQuizMarker({
+        id: `${editorVideoId}:${pos}:${type}`,
+        videoID: editorVideoId,
+        pos,
+        type,
+        createdAt: Date.now(),
+      });
+      r.client.catch(() => {});
+      r.server.catch(() => {});
+      return true;
+    }
+    return false;
+  };
+
   const addMarker = () => {
     if (markers.some((m) => Math.abs(m.pos - playhead) < 5)) return;
-    const next: Marker = { pos: playhead, type: 'mc' };
-    setMarkers([...markers, next].sort((a, b) => a.pos - b.pos));
+    if (!persistMarker(playhead, 'mc')) {
+      const next: Marker = { pos: playhead, type: 'mc' };
+      setLocalMarkers((m) => [...m, next].sort((a, b) => a.pos - b.pos));
+    }
   };
 
   const genAI = () => {
@@ -99,8 +136,10 @@ export default function StudioScreen() {
     setAiBusy(true);
     aiTimer.current = setTimeout(() => {
       setAiBusy(false);
-      const aiMarker: Marker = { pos: 88, type: 'meaning' };
-      setMarkers((m) => [...m, aiMarker].sort((a, b) => a.pos - b.pos));
+      if (!persistMarker(88, 'meaning')) {
+        const aiMarker: Marker = { pos: 88, type: 'meaning' };
+        setLocalMarkers((m) => [...m, aiMarker].sort((a, b) => a.pos - b.pos));
+      }
     }, 1400);
   };
 
@@ -146,7 +185,7 @@ export default function StudioScreen() {
         {view === 'home' && (
           <MyVideosHome onEditor={() => setView('editor')} onStats={() => setView('stats')} />
         )}
-        {view === 'stats' && <AnalyticsTab />}
+        {view === 'stats' && <AnalyticsTab video={ownVideos[0]} />}
         {view === 'editor' && (
           <Editor
             markers={markers}
@@ -508,17 +547,42 @@ const STAT_TILES: [string, string, string][] = [
   ['❤️', '12K', 'Лайки'],
 ];
 
-function AnalyticsTab() {
+type AnalyticsVideo = { id: string; views?: number | null; completionRate?: number | null; likes?: string | null };
+
+function AnalyticsTab({ video }: { video?: AnalyticsVideo }) {
+  const [analytics] = useQuery(useVideoAnalyticsQuery(video?.id ?? ''));
+
+  // Retention curve: prefer materialized analytics, else the static fallback.
+  const retention: readonly number[] =
+    analytics && analytics.retention.length > 0 ? analytics.retention : RETENTION;
+
+  // Engagement heatmap: prefer materialized analytics (padded/sliced to the
+  // 35-cell grid the map renders), else the seeded PRNG fallback.
   const heat = useMemo(() => {
+    if (analytics && analytics.engagement.length > 0) {
+      const cells = analytics.engagement.slice(0, 35);
+      while (cells.length < 35) cells.push(0);
+      return cells;
+    }
     const rng = seeded(20240603);
     return Array.from({ length: 35 }, () => rng());
-  }, []);
+  }, [analytics]);
+
+  // Stat tiles: derived from the real video row when present, else the static
+  // fallback trio.
+  const statTiles: [string, string, string][] = video
+    ? [
+        ['👁', formatViews(video.views ?? 0), 'Просмотры'],
+        ['⚡', `${video.completionRate ?? 0}%`, 'Заверш.'],
+        ['❤️', video.likes ?? '0', 'Лайки'],
+      ]
+    : STAT_TILES;
 
   return (
     <View style={{ paddingHorizontal: 22 }}>
       {/* top stats */}
       <View className="flex-row gap-2.5" style={{ marginBottom: 18 }}>
-        {STAT_TILES.map(([e, v, l], i) => (
+        {statTiles.map(([e, v, l], i) => (
           <View
             key={i}
             className="flex-1 items-center rounded-[20px] bg-surface"
@@ -544,7 +608,7 @@ function AnalyticsTab() {
           Удержание зрителей
         </Text>
         <View className="flex-row items-end gap-[5px]" style={{ height: 96 }}>
-          {RETENTION.map((h, i) => (
+          {retention.map((h, i) => (
             <View key={i} className="flex-1 overflow-hidden" style={{ height: `${h}%`, borderTopLeftRadius: 5, borderTopRightRadius: 5, opacity: 0.4 + (h / 100) * 0.6 }}>
               <LinearGradient
                 colors={[COLORS.lime, 'rgba(182,242,61,0.2)']}
