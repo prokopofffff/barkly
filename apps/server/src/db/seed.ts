@@ -1,6 +1,8 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { seedVideos } from "@/db/seed-videos.gen";
+import { aggregateByVideo, type ProgressRow } from "@/domain/analytics";
 
 // Dev seed: one demo user plus enough content to light up every screen over
 // Zero. The feed videos come from `seed-videos.gen.ts` — a snapshot of real,
@@ -42,6 +44,49 @@ async function seed() {
     .insert(s.video)
     .values(seedVideos.map((v, i) => (i < 3 ? { ...v, creatorId: U } : v)))
     .onConflictDoNothing();
+
+  // Watch history for the demo owner's first 3 clips (bk-cj6.24). A spread of
+  // viewers (some completed, some not) so the denormalized creator stats below
+  // aggregate to realistic views + completion. One row per (user, video).
+  const [v0, v1, v2] = seedVideos.map((v) => v.id);
+  if (!v0 || !v1 || !v2) throw new Error("seed: expected at least 3 seedVideos");
+  const seededProgress: ProgressRow[] = [
+    // v0: 5 viewers, 4 completed -> 80%
+    { userID: U, videoID: v0, completed: true },
+    { userID: "u_max", videoID: v0, completed: true },
+    { userID: "u_sofia", videoID: v0, completed: true },
+    { userID: "u_timur", videoID: v0, completed: true },
+    { userID: "u_jenny", videoID: v0, completed: false },
+    // v1: 4 viewers, 2 completed -> 50%
+    { userID: U, videoID: v1, completed: true },
+    { userID: "u_max", videoID: v1, completed: true },
+    { userID: "u_ilya", videoID: v1, completed: false },
+    { userID: "u_timur", videoID: v1, completed: false },
+    // v2: 3 viewers, 1 completed -> 33%
+    { userID: "u_sofia", videoID: v2, completed: true },
+    { userID: "u_jenny", videoID: v2, completed: false },
+    { userID: "u_ilya", videoID: v2, completed: false },
+  ];
+
+  await db
+    .insert(s.progress)
+    .values(
+      seededProgress.map((p, i) => ({
+        id: `${p.userID}:${p.videoID}`,
+        userID: p.userID,
+        videoID: p.videoID,
+        watchedMs: 4000 + i * 500,
+        completed: p.completed,
+        score: p.completed ? 60 + ((i * 7) % 40) : (i * 11) % 60,
+        updatedAt: now,
+      })),
+    )
+    .onConflictDoNothing();
+
+  // Denormalize per-video creator stats from exactly those seeded rows.
+  for (const [videoID, { views, completionRate }] of aggregateByVideo(seededProgress)) {
+    await db.update(s.video).set({ views, completionRate }).where(eq(s.video.id, videoID));
+  }
 
   await db
     .insert(s.cosmetic)

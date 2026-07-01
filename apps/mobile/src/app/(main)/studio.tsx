@@ -166,6 +166,9 @@ export default function StudioScreen() {
 /* ----------------------- Мои видео (hub) ----------------------- */
 type StudioVideo = { title: string; grad: readonly [string, string]; views: string; done: string; quizzes: number };
 
+// Compact view count formatter, e.g. 1200 -> "1.2K", 940 -> "940".
+const formatViews = (n: number): string => (n >= 1000 ? `${Math.round(n / 100) / 10}K` : String(n));
+
 // Placeholder list shown before the creator has any published clips in the
 // replica (same spirit as the feed's SAMPLE_VIDEOS fallback) — never blank.
 const SAMPLE_MINE: StudioVideo[] = [
@@ -177,16 +180,16 @@ const SAMPLE_MINE: StudioVideo[] = [
 function MyVideosHome({ onEditor, onStats }: { onEditor: () => void; onStats: () => void }) {
   const { user } = useAuth();
   const [rows] = useQuery(useCreatorVideosQuery(user?.userID ?? ''));
-  // `views` is an engagement stand-in (row.likes) — real views/completion are
-  // DEFERRED to bk-cj6.24; `done` is left blank until then. One quiz jsonb per row.
+  // `views`/`done` come from the real integer columns on the video row
+  // (views, completionRate 0-100). One quiz jsonb per row.
   const mine: StudioVideo[] =
     rows.length === 0
       ? SAMPLE_MINE
       : rows.map((v) => ({
           title: v.caption || v.catEn,
           grad: [v.bgGradient[0], v.bgGradient[1]] as const,
-          views: v.likes,
-          done: '—',
+          views: formatViews(v.views ?? 0),
+          done: `${v.completionRate ?? 0}%`,
           quizzes: 1,
         }));
 

@@ -79,6 +79,11 @@ export const video = pgTable("video", {
   // Difficulty on the ELO scale (0-1000), synced from the ingestion prior.
   // Feeds adaptive matchmaking (user.elo ± window). bk-z5t.18.
   difficulty: integer("difficulty").notNull().default(0),
+  // Denormalized creator stats aggregated from the progress table (bk-cj6.24).
+  // `views` = distinct viewers; `completionRate` = 0-100 % of those who
+  // finished. Recomputed by src/domain/analytics.ts; seeded for the demo owner.
+  views: integer("views").notNull().default(0),
+  completionRate: integer("completion_rate").notNull().default(0), // 0-100
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 
