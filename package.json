@@ -19,5 +19,8 @@
     "@rocicorp/zero-sqlite3",
     "protobufjs",
     "unrs-resolver"
-  ]
+  ],
+  "overrides": {
+    "expo-constants": "56.0.19"
+  }
 }
